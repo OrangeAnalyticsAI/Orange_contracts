@@ -93,8 +93,26 @@ class OrangeContractApp {
 
     async initializeAuth() {
         console.log('Auth callback hash:', window.location.hash);
-        const { data: { session }, error } = await this.db.auth.getSession();
+        let { data: { session }, error } = await this.db.auth.getSession();
         console.log('getSession result:', { session, error });
+
+        // OAuth callback tokens are in the URL hash; getSession does not parse them.
+        if (!session && window.location.hash.includes('access_token=')) {
+            const params = new URLSearchParams(window.location.hash.slice(1));
+            const accessToken = params.get('access_token');
+            const refreshToken = params.get('refresh_token');
+            console.log('Manually setting session from URL hash');
+            const { data: setData, error: setError } = await this.db.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken
+            });
+            console.log('setSession result:', { setData, setError });
+            if (!setError) {
+                ({ data: { session }, error } = await this.db.auth.getSession());
+                console.log('getSession after setSession:', { session, error });
+            }
+        }
+
         if (error) throw error;
 
         if (!session) {
