@@ -1,6 +1,6 @@
 const SUPABASE_URL_DEFAULT = 'https://jqfnlcdcxcydqwufgwpm.supabase.co';
 const SUPABASE_KEY_DEFAULT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJqYWZubGNkY3hjeWRxd3VmZ3dwbSIsInJlZiI6ImpxZm5sY2RjeGN5ZHF3dWZnd3BtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NDQ2OTYsImV4cCI6MjA5NjIyMDY5Nn0.CM_RwjP4RFmS80aUsT_kaV03ltXrJfE9lr_EgRiD_s8';
-const ALLOWED_ACCOUNT_EMAIL = 'jenpayneg@yahoo.com';
+const ALLOWED_ACCOUNT_EMAIL = 'jenpayneg@gmail.com';
 
 class OrangeContractApp {
     constructor() {
