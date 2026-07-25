@@ -1,5 +1,5 @@
 const SUPABASE_URL_DEFAULT = 'https://jqfnlcdcxcydqwufgwpm.supabase.co';
-const SUPABASE_KEY_DEFAULT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJqYWZubGNkY3hjeWRxd3VmZ3dwbSIsInJlZiI6ImpxZm5sY2RjeGN5ZHF3dWZnd3BtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NDQ2OTYsImV4cCI6MjA5NjIyMDY5Nn0.CM_RwjP4RFmS80aUsT_kaV03ltXrJfE9lr_EgRiD_s8';
+const SUPABASE_KEY_DEFAULT = 'sb_publishable_r-IYBk1NyA18HITtgz8MBw_zNfOPKj2';
 const ALLOWED_ACCOUNT_EMAIL = 'jenpayneg@gmail.com';
 
 class OrangeContractApp {
@@ -69,7 +69,7 @@ class OrangeContractApp {
         // Register Service Worker for PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=9')
+                navigator.serviceWorker.register('./sw.js?v=10')
                     .then(reg => console.log('Service Worker registered successfully:', reg.scope))
                     .catch(err => console.warn('Service Worker registration failed:', err));
             });
@@ -79,10 +79,8 @@ class OrangeContractApp {
     // ─── Supabase ──────────────────────────────────────────────────────────────
 
     async initSupabase() {
-        const url = await credentialManager.get('sb-url') || SUPABASE_URL_DEFAULT;
-        const key = await credentialManager.get('sb-key') || SUPABASE_KEY_DEFAULT;
         this.setSyncStatus('connecting');
-        this.db = supabase.createClient(url, key);
+        this.db = supabase.createClient(SUPABASE_URL_DEFAULT, SUPABASE_KEY_DEFAULT);
         this.useSupabase = true;
     }
 
@@ -92,25 +90,20 @@ class OrangeContractApp {
     }
 
     async initializeAuth() {
-        console.log('Auth callback hash:', window.location.hash);
         let { data: { session }, error } = await this.db.auth.getSession();
-        console.log('getSession result:', { session, error });
 
         // OAuth callback tokens are in the URL hash; getSession does not parse them.
         if (!session && window.location.hash.includes('access_token=')) {
             const params = new URLSearchParams(window.location.hash.slice(1));
             const accessToken = params.get('access_token');
             const refreshToken = params.get('refresh_token');
-            console.log('Manually setting session from URL hash');
             const { data: setData, error: setError } = await this.db.auth.setSession({
                 access_token: accessToken,
                 refresh_token: refreshToken
             });
-            console.log('setSession result:', { setData, setError });
-            if (!setError) {
-                ({ data: { session }, error } = await this.db.auth.getSession());
-                console.log('getSession after setSession:', { session, error });
-            }
+            window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+            if (setError) throw setError;
+            session = setData.session;
         }
 
         if (error) throw error;
@@ -143,7 +136,6 @@ class OrangeContractApp {
         errorElement.textContent = '';
 
         const redirectUrl = window.location.origin;
-        console.log('OAuth redirectTo:', redirectUrl);
         const { error } = await this.db.auth.signInWithOAuth({
             provider: 'google',
             options: { redirectTo: redirectUrl }
