@@ -236,11 +236,15 @@ header p {
 }
 
 .account-controls button {
-    padding: 0.35rem 0.65rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
     background: transparent;
     color: var(--cream-dim);
     border: 1px solid var(--border-lt);
-    font-family: 'Share Tech Mono', monospace;
     cursor: pointer;
 }
 

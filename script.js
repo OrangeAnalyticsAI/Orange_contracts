@@ -170,7 +170,10 @@ class OrangeContractApp {
     showAuthenticatedApp() {
         document.body.classList.remove('auth-pending', 'auth-required');
         document.body.classList.add('auth-ready');
-        document.getElementById('account-email').textContent = this.currentUser.email;
+        const signOutButton = document.getElementById('sign-out');
+        if (signOutButton && this.currentUser) {
+            signOutButton.title = `Signed in as ${this.currentUser.email}`;
+        }
         document.getElementById('account-controls').classList.remove('hidden');
     }
 
