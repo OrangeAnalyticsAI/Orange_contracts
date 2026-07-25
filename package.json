@@ -1,0 +1,12 @@
+{
+  "name": "orange-contract",
+  "version": "1.0.0",
+  "description": "Weekly travel expense tracker for Scotland",
+  "scripts": {
+    "dev": "python -m http.server 8000",
+    "serve": "python -m http.server 8000"
+  },
+  "keywords": ["expense", "tracker", "travel", "scotland"],
+  "author": "",
+  "license": "MIT"
+}

@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orange Contract - Weekly Travel Expense Tracker</title>
+    <link rel="stylesheet" href="styles.css?v=7">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ff6b35">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='55' r='40' fill='%23ff6b35'/><path d='M50,15 C52,5 42,5 42,5' stroke='%2322c55e' stroke-width='6' fill='none'/></svg>">
+</head>
+<body class="auth-pending">
+    <section id="auth-gate" class="auth-gate" aria-live="polite">
+        <div class="auth-card">
+            <div class="auth-logo" aria-hidden="true">🍊</div>
+            <p class="auth-kicker">Private access</p>
+            <h1>Orange Contract</h1>
+            <p class="auth-message">Sign in with your approved Google account to continue.</p>
+            <button id="google-sign-in" class="google-sign-in" type="button" disabled>
+                <span class="google-mark" aria-hidden="true">G</span>
+                Sign in with Google
+            </button>
+            <p id="auth-error" class="auth-error" role="alert"></p>
+        </div>
+    </section>
+
+    <header>
+        <h1>🍊 Orange Contract</h1>
+        <p>Weekly Travel Expense Tracker for Scotland</p>
+        <nav class="main-nav">
+            <button class="nav-btn active" data-section="dashboard">Weekly</button>
+            <button class="nav-btn" data-section="schedule">Schedule</button>
+            <button class="nav-btn" data-section="monthly">Monthly</button>
+            <button class="nav-btn" data-section="bookings">Flights</button>
+            <button class="nav-btn" data-section="parking">Parking</button>
+            <button class="nav-btn" data-section="accommodation">Accommodation</button>
+            <button class="nav-btn" data-section="transport">Transport</button>
+            <button class="nav-btn hidden" data-section="freeagent">FreeAgent</button>
+            <button class="nav-btn" data-section="import">Import Email</button>
+            <button class="nav-btn" data-section="settings">Settings</button>
+        </nav>
+        <div class="header-status">
+            <div id="sync-status" class="sync-status">⏳ Connecting...</div>
+            <div id="account-controls" class="account-controls hidden">
+                <span id="account-email"></span>
+                <button id="sign-out" type="button">Sign out</button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Dashboard Section -->
+        <section id="dashboard-section" class="content-section active">
+            <section class="dashboard">
+                <div class="dashboard-cards">
+                    <div class="card">
+                        <h3>Current Week</h3>
+                        <div id="current-week">-</div>
+                    </div>
+                    <div class="card">
+                        <h3>Total Weekly Cost</h3>
+                        <div id="weekly-total">£0.00</div>
+                    </div>
+                    <div class="card">
+                        <h3>Monthly Estimate</h3>
+                        <div id="monthly-estimate">£0.00</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="week-view">
+                <div class="week-controls">
+                    <button id="prev-week">← Previous Week</button>
+                    <h2 id="week-display">Week of -</h2>
+                    <button id="next-week">Next Week →</button>
+                </div>
+                <div class="expense-table-container">
+                    <table class="expense-table">
+                        <thead>
+                            <tr>
+                                <th>Day</th>
+                                <th>Location</th>
+                                <th>Flight</th>
+                                <th>Parking</th>
+                                <th>Accommodation</th>
+                                <th>Transport</th>
+                                <th>Food</th>
+                                <th>Daily Total</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="week-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="expense-form">
+                <h3>Add/Edit Expenses</h3>
+                <form id="expense-form">
+                    <input type="hidden" id="selected-date">
+                    <div class="form-group">
+                        <label for="location">Location:</label>
+                        <select id="location">
+                            <option value="">Select location...</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="flight">Flight (£):</label>
+                            <input type="number" id="flight" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label for="parking">Silver Zone Parking (£):</label>
+                            <input type="number" id="parking" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="accommodation">Accommodation (£):</label>
+                            <input type="number" id="accommodation" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label for="transport">Transport (Bus/Taxi) (£):</label>
+                            <input type="number" id="transport" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="food">Food (£):</label>
+                        <input type="number" id="food" step="0.01" min="0" placeholder="0.00">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit">Save Expenses</button>
+                        <button type="button" id="clear-form">Clear</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="export-section">
+                <h3>Export for FreeAgent</h3>
+                <button id="export-csv">Export to CSV</button>
+                <button id="export-json">Export to JSON</button>
+            </section>
+        </section>
+
+        <section id="schedule-section" class="content-section">
+            <section class="schedule-view">
+                <div class="schedule-controls">
+                    <button id="schedule-prev-week">← Previous Week</button>
+                    <div class="schedule-title">
+                        <span>Departures &amp; Transfers</span>
+                        <h2 id="schedule-week-display">Week of -</h2>
+                    </div>
+                    <button id="schedule-next-week">Next Week →</button>
+                </div>
+                <div class="schedule-legend" aria-label="Schedule types">
+                    <span class="schedule-legend-item flight">Flight</span>
+                    <span class="schedule-legend-item parking">Parking</span>
+                    <span class="schedule-legend-item transport">Transport</span>
+                </div>
+                <div class="schedule-calendar-wrap">
+                    <div id="schedule-calendar" class="schedule-calendar"></div>
+                </div>
+            </section>
+        </section>
+
+        <!-- Monthly Dashboard Section -->
+        <section id="monthly-section" class="content-section">
+            <section class="dashboard">
+                <div class="dashboard-cards">
+                    <div class="card">
+                        <h3>Current Month</h3>
+                        <div id="current-month">-</div>
+                    </div>
+                    <div class="card">
+                        <h3>Net Profit</h3>
+                        <div id="month-net-profit">£0.00</div>
+                    </div>
+                    <div class="card">
+                        <h3>Actual Day Rate</h3>
+                        <div id="month-actual-day-rate">£0.00</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="month-view">
+                <div class="month-controls">
+                    <button id="prev-month">← Previous Month</button>
+                    <h2 id="month-display">Month of -</h2>
+                    <button id="next-month">Next Month →</button>
+                </div>
+
+                <div class="expense-table-container">
+                    <table class="expense-table">
+                        <thead>
+                            <tr>
+                                <th>Day</th>
+                                <th>Date</th>
+                                <th>Location</th>
+                                <th>Flight</th>
+                                <th>Parking</th>
+                                <th>Accommodation</th>
+                                <th>Transport</th>
+                                <th>Food</th>
+                                <th>Day Rate</th>
+                                <th>Daily Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="month-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </section>
+
+        <!-- Bookings Section -->
+        <section id="bookings-section" class="content-section">
+            <section class="bookings-panel">
+                <div class="bookings-header">
+                    <h3>Booked Flights</h3>
+                    <button id="add-booking-btn">+ Add Booking</button>
+                </div>
+
+                <!-- Add/Edit Booking Form -->
+                <div id="booking-form-container" class="booking-form-container hidden">
+                    <h4 id="booking-form-title">Add Booking</h4>
+                    <form id="booking-form">
+                        <input type="hidden" id="booking-id">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="booking-flight-number">Flight Number:</label>
+                                <input type="text" id="booking-flight-number" placeholder="e.g., EZY201" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="booking-route">Route:</label>
+                                <input type="text" id="booking-route" placeholder="e.g., Bristol → Glasgow" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="booking-date">Date:</label>
+                                <input type="date" id="booking-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="booking-departure">Departure:</label>
+                                <input type="text" id="booking-departure" placeholder="e.g., 07:15">
+                            </div>
+                            <div class="form-group">
+                                <label for="booking-arrival">Arrival:</label>
+                                <input type="text" id="booking-arrival" placeholder="e.g., 08:35">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="booking-price">Price Paid (£):</label>
+                                <input type="number" id="booking-price" step="0.01" min="0" placeholder="0.00" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="booking-ref">Booking Reference:</label>
+                                <input type="text" id="booking-ref" placeholder="e.g., AB12CD">
+                            </div>
+                            <div class="form-group">
+                                <label for="booking-seat">Seat:</label>
+                                <input type="text" id="booking-seat" placeholder="e.g., 27A">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="booking-booking-date">Booking Date:</label>
+                                <input type="date" id="booking-booking-date">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="booking-notes">Notes:</label>
+                            <input type="text" id="booking-notes" placeholder="e.g., seats 3A/3B">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit">Save Booking</button>
+                            <button type="button" id="cancel-booking-btn">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="bookings-list">
+                    <!-- Bookings rendered by JS -->
+                </div>
+            </section>
+        </section>
+
+        <!-- Parking Section -->
+        <section id="parking-section" class="content-section">
+            <section class="bookings-panel">
+                <div class="bookings-header">
+                    <h3>Car Park Bookings</h3>
+                    <button id="add-parking-btn">+ Add Parking</button>
+                </div>
+
+                <!-- Add/Edit Parking Form -->
+                <div id="parking-form-container" class="booking-form-container hidden">
+                    <h4 id="parking-form-title">Add Parking Booking</h4>
+                    <form id="parking-form">
+                        <input type="hidden" id="parking-id">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="parking-name">Car Park Name:</label>
+                                <input type="text" id="parking-name" placeholder="e.g., Silver Zone" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="parking-ref">Booking Reference:</label>
+                                <input type="text" id="parking-ref" placeholder="e.g., B2PDT">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="parking-arrival-date">Arrival Date:</label>
+                                <input type="date" id="parking-arrival-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="parking-arrival-time">Arrival Time:</label>
+                                <input type="text" id="parking-arrival-time" placeholder="e.g., 19:00">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="parking-return-date">Return Date:</label>
+                                <input type="date" id="parking-return-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="parking-return-time">Return Time:</label>
+                                <input type="text" id="parking-return-time" placeholder="e.g., 23:55">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="parking-price">Price Paid (£):</label>
+                                <input type="number" id="parking-price" step="0.01" min="0" placeholder="0.00" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="parking-car-reg">Car Registration:</label>
+                                <input type="text" id="parking-car-reg" placeholder="e.g., JP22BUZ">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="parking-booking-date">Booking Date:</label>
+                                <input type="date" id="parking-booking-date">
+                            </div>
+                            <div class="form-group">
+                                <label for="parking-booking-status">Booking Status:</label>
+                                <select id="parking-booking-status">
+                                    <option value="Booking">Booking</option>
+                                    <option value="Amendment">Amendment</option>
+                                    <option value="Cancellation">Cancellation</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="parking-notes">Notes:</label>
+                            <input type="text" id="parking-notes" placeholder="e.g., Meet and Greet">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit">Save Parking</button>
+                            <button type="button" id="cancel-parking-btn">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="parking-list">
+                    <!-- Parking bookings rendered by JS -->
+                </div>
+            </section>
+        </section>
+
+        <!-- Accommodation Section -->
+        <section id="accommodation-section" class="content-section">
+            <section class="bookings-panel">
+                <div class="bookings-header">
+                    <h3>Accommodation Bookings</h3>
+                    <button id="add-accommodation-btn">+ Add Accommodation</button>
+                </div>
+
+                <!-- Add/Edit Accommodation Form -->
+                <div id="accommodation-form-container" class="booking-form-container hidden">
+                    <h4 id="accommodation-form-title">Add Accommodation</h4>
+                    <form id="accommodation-form">
+                        <input type="hidden" id="accommodation-id">
+                        <div class="form-group">
+                            <label for="accommodation-name">Accommodation Name:</label>
+                            <input type="text" id="accommodation-name" placeholder="e.g., Premier Inn Glasgow City Centre" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="accommodation-from-date">From Date:</label>
+                                <input type="date" id="accommodation-from-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="accommodation-to-date">To Date:</label>
+                                <input type="date" id="accommodation-to-date" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="accommodation-price-per-night">Price Per Night (£):</label>
+                                <input type="number" id="accommodation-price-per-night" step="0.01" min="0" placeholder="0.00" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="accommodation-booking-date">Booking Date:</label>
+                                <input type="date" id="accommodation-booking-date">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="accommodation-breakfast" class="checkbox-label">
+                                <input type="checkbox" id="accommodation-breakfast">
+                                Breakfast Included
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="accommodation-notes">Notes:</label>
+                            <input type="text" id="accommodation-notes" placeholder="e.g., Room 204, parking included">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit">Save Accommodation</button>
+                            <button type="button" id="cancel-accommodation-btn">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="accommodation-list">
+                    <!-- Accommodation bookings rendered by JS -->
+                </div>
+            </section>
+        </section>
+
+        <!-- Transport Section -->
+        <section id="transport-section" class="content-section">
+            <section class="bookings-panel">
+                <div class="bookings-header">
+                    <h3>Transport Bookings</h3>
+                    <button id="add-transport-btn">+ Add Transport</button>
+                </div>
+
+                <!-- Add/Edit Transport Form -->
+                <div id="transport-form-container" class="booking-form-container hidden">
+                    <h4 id="transport-form-title">Add Transport</h4>
+                    <form id="transport-form">
+                        <input type="hidden" id="transport-id">
+                        <div class="form-group">
+                            <label for="transport-name">Transport Name:</label>
+                            <input type="text" id="transport-name" placeholder="e.g., Hire Car - Edinburgh" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="transport-from-date">From Date:</label>
+                                <input type="date" id="transport-from-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="transport-to-date">To Date:</label>
+                                <input type="date" id="transport-to-date" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="transport-total-cost">Total Cost (£):</label>
+                                <input type="number" id="transport-total-cost" step="0.01" min="0" placeholder="0.00" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="transport-booking-date">Booking Date:</label>
+                                <input type="date" id="transport-booking-date">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="transport-notes">Notes:</label>
+                            <input type="text" id="transport-notes" placeholder="e.g., Car rental, fuel excluded">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit">Save Transport</button>
+                            <button type="button" id="cancel-transport-btn">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="transport-list">
+                    <!-- Transport bookings rendered by JS -->
+                </div>
+            </section>
+        </section>
+
+        <!-- FreeAgent Section -->
+        <section id="freeagent-section" class="content-section hidden">
+            <section class="bookings-panel">
+                <div class="bookings-header">
+                    <h3>FreeAgent Expenses</h3>
+                    <button id="fetch-freeagent-btn">🔄 Fetch Expenses</button>
+                </div>
+
+                <div class="freeagent-controls">
+                    <div class="form-group">
+                        <label for="freeagent-date-range">Date Range:</label>
+                        <div class="form-row">
+                            <input type="date" id="freeagent-from-date">
+                            <span>to</span>
+                            <input type="date" id="freeagent-to-date">
+                        </div>
+                    </div>
+                    <p class="settings-help">Select expenses from FreeAgent that relate to your Scotland trip costs (food, transport, etc.). Tick the box to link them to your expense tracking.</p>
+                </div>
+
+                <div id="freeagent-loading" class="loading-indicator hidden">
+                    <div class="spinner"></div>
+                    <p>Loading expenses from FreeAgent...</p>
+                </div>
+
+                <div id="freeagent-expenses-list">
+                    <!-- FreeAgent expenses rendered by JS -->
+                </div>
+
+                <div id="freeagent-linked-summary" class="linked-summary hidden">
+                    <h4>Linked Expenses Summary</h4>
+                    <div id="freeagent-linked-total"></div>
+                </div>
+            </section>
+        </section>
+
+        <!-- Email Import Section -->
+        <section id="import-section" class="content-section">
+            <section class="email-import">
+                <h3>Import from Gmail</h3>
+                <div class="gmail-connect-area">
+                    <div class="gmail-status" id="gmail-status">
+                        <span class="gmail-dot disconnected"></span>
+                        <span id="gmail-status-text">Not connected to Gmail</span>
+                    </div>
+                    <div class="gmail-actions">
+                        <button id="gmail-connect-btn" class="gmail-btn">🔗 Connect Gmail</button>
+                        <button id="gmail-search-btn" class="gmail-btn secondary" disabled>🔍 Search for flight bookings</button>
+                        <button id="gmail-parking-search-btn" class="gmail-btn secondary" disabled>🚗 Search for parking bookings</button>
+                        <button id="gmail-disconnect-btn" class="gmail-btn danger hidden">Disconnect</button>
+                    </div>
+                    <p class="import-help">Grant read-only access to your Gmail so the app can find your easyJet and Loganair booking confirmations automatically. Requires a Google Client ID in Settings.</p>
+                </div>
+
+                <div id="gmail-results" class="gmail-results hidden"></div>
+
+                <div class="import-divider"><span>or paste manually</span></div>
+
+                <div class="import-controls">
+                    <div class="form-group">
+                        <label for="parser-engine">Parsing Engine:</label>
+                        <select id="parser-engine">
+                            <option value="regex">✈️ Standard Code Parser (Fast & Local)</option>
+                            <option value="gemini">🧠 Gemini AI Parser (Intelligent - Auto-detects flights, parking, hotels, food, etc.)</option>
+                        </select>
+                    </div>
+                    <textarea id="email-text" placeholder="Paste your travel confirmation email here (can be easyJet flights, Bristol Airport Parking, hotels, ryanair, trains, etc.)..."></textarea>
+                    <button id="parse-email">Parse Email</button>
+                </div>
+                <div id="parsed-flight" class="parsed-flight-display"></div>
+                
+                <!-- Test Phase Debug Console -->
+                <div id="import-debug-panel" class="settings-panel" style="margin-top: 2rem; border-top: 1px dashed var(--border-lt); padding-top: 1.5rem;">
+                    <details>
+                        <summary style="cursor: pointer; color: var(--muted); user-select: none; font-family: 'Bebas Neue', sans-serif; letter-spacing: 2px; font-size: 1rem;">🛠 FLIGHT SEARCH DEBUG CONSOLE</summary>
+                        <div id="debug-log-output" style="margin-top: 1rem; background: var(--tile-bg, #090f1c); border: 1px solid var(--border, #1c3050); padding: 1rem; font-family: 'Share Tech Mono', monospace; font-size: 0.8rem; color: #38bdf8; max-height: 250px; overflow-y: auto; white-space: pre-wrap;">No search logs captured yet. Run 'Search for flight bookings' to populate debug logs.</div>
+                    </details>
+                </div>
+            </section>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings-section" class="content-section">
+
+            <!-- Mobile App PWA Install -->
+            <section class="settings-panel">
+                <h3>📱 Install Mobile App</h3>
+                <p class="settings-help">Install Orange Contract as a standalone applet on your Android phone or computer for instant access and offline usability.</p>
+                <div class="settings-controls">
+                    <button id="pwa-install-btn" class="gmail-btn" style="width: 100%; display: none;">📥 Install App to Device</button>
+                    <p id="pwa-install-help" style="font-size: 0.85rem; color: #94a3b8; text-align: center; margin-top: 0.5rem;">
+                        To install manually: Tap your browser's menu (three dots) and select <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong>.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Gemini AI Setup -->
+            <section class="settings-panel">
+                <h3>🧠 Gemini AI Integration</h3>
+                <p class="settings-help">Supply a Gemini API Key to intelligently parse any booking email (such as airport parking, hotels, train tickets, flights, or meals). Settings are stored in your secure Supabase database and sync automatically to all devices.</p>
+                <details class="setup-steps">
+                    <summary>How to get a Free Gemini API Key</summary>
+                    <ol>
+                        <li>Go to <a href="https://aistudio.google.com/" target="_blank">aistudio.google.com</a></li>
+                        <li>Click <strong>Get API Key</strong> and sign in with any Google Account</li>
+                        <li>Click <strong>Create API Key</strong></li>
+                        <li>Copy the generated key and paste it below</li>
+                    </ol>
+                </details>
+                <div class="settings-controls">
+                    <div class="form-group">
+                        <label for="gemini-api-key">Gemini API Key:</label>
+                        <input type="password" id="gemini-api-key" placeholder="AIzaSy..." autocomplete="off">
+                    </div>
+                    <div class="form-actions">
+                        <button id="save-gemini-key" type="button">Save Gemini Key</button>
+                    </div>
+                </div>
+                <div id="gemini-settings-status" class="api-status-display"></div>
+            </section>
+
+            <!-- FreeAgent -->
+            <section class="settings-panel">
+                <h3>💼 FreeAgent Sync</h3>
+                <p class="settings-help">Automatically push food, transport, and travel expenses into your FreeAgent business account. Saves you manual bookkeeping entry time.</p>
+                <div class="settings-controls">
+                    <div class="form-group">
+                        <label for="show-freeagent-toggle" class="checkbox-label">
+                            <input type="checkbox" id="show-freeagent-toggle">
+                            Show FreeAgent tab
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="freeagent-token">FreeAgent Access Token / API Key:</label>
+                        <input type="password" id="freeagent-token" placeholder="Bearer Token..." autocomplete="off">
+                    </div>
+                    <div class="form-actions">
+                        <button id="save-freeagent" type="button">Save FreeAgent Key</button>
+                    </div>
+                </div>
+                <div id="freeagent-settings-status" class="api-status-display"></div>
+            </section>
+
+            <!-- Locations -->
+            <section class="settings-panel">
+                <h3>📍 Locations</h3>
+                <p class="settings-help">Define the locations you travel to. These will appear as a dropdown when adding expenses.</p>
+                <div class="settings-controls">
+                    <div class="form-group">
+                        <label for="locations-list">Locations (one per line):</label>
+                        <textarea id="locations-list" rows="6" placeholder="Glasgow&#10;Aberdeen&#10;Southampton&#10;Home"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button id="save-locations" type="button">Save Locations</button>
+                    </div>
+                </div>
+                <div id="locations-settings-status" class="api-status-display"></div>
+            </section>
+
+            <!-- Google / Gmail -->
+            <section class="settings-panel">
+                <h3>Google / Gmail Integration</h3>
+                <p class="settings-help">To let the app search your Gmail for easyJet booking confirmations, you need a Google OAuth Client ID. This is a one-time setup.</p>
+                <details class="setup-steps">
+                    <summary>How to get a Google Client ID</summary>
+                    <ol>
+                        <li>Go to <a href="https://console.cloud.google.com/" target="_blank">console.cloud.google.com</a></li>
+                        <li>Create a new project (e.g. <em>OrangeContract</em>)</li>
+                        <li>Go to <strong>APIs &amp; Services → Enable APIs</strong> and enable the <strong>Gmail API</strong></li>
+                        <li>Go to <strong>APIs &amp; Services → Credentials → Create Credentials → OAuth client ID</strong></li>
+                        <li>Application type: <strong>Web application</strong></li>
+                        <li>Add <code>http://localhost:8000</code> as an <strong>Authorised JavaScript origin</strong></li>
+                        <li>Copy the <strong>Client ID</strong> (ends in <code>.apps.googleusercontent.com</code>) and paste below</li>
+                    </ol>
+                </details>
+                <div class="settings-controls">
+                    <div class="form-group">
+                        <label for="google-client-id">Google OAuth Client ID:</label>
+                        <input type="text" id="google-client-id" placeholder="xxxx.apps.googleusercontent.com">
+                    </div>
+                    <div class="form-actions">
+                        <button id="save-google-client-id" type="button">Save Client ID</button>
+                    </div>
+                </div>
+                <div id="google-settings-status" class="api-status-display"></div>
+            </section>
+
+            <!-- Supabase -->
+            <section class="settings-panel">
+                <h3>Database Connection</h3>
+                <p class="settings-help">Connect to Supabase for persistent storage across devices. Without this, data is stored locally in your browser only.</p>
+                <form id="supabase-settings-form" onsubmit="return false;">
+                    <div class="settings-controls">
+                        <div class="form-group">
+                            <label for="supabase-url">Supabase Project URL:</label>
+                            <input type="text" id="supabase-url" placeholder="https://xxxx.supabase.co" autocomplete="url">
+                        </div>
+                        <div class="form-group">
+                            <label for="supabase-key">Supabase Anon Key:</label>
+                            <input type="password" id="supabase-key" placeholder="eyJhbGci..." autocomplete="current-password">
+                        </div>
+                        <div class="form-actions">
+                            <button id="save-supabase" type="button">Save & Connect</button>
+                            <button id="test-supabase" type="button">Test Connection</button>
+                        </div>
+                    </div>
+                </form>
+                <div id="db-status" class="api-status-display"></div>
+            </section>
+
+            <!-- Credential Backup/Restore -->
+            <section class="settings-panel">
+                <h3>🔐 Credential Backup & Restore</h3>
+                <p class="settings-help">Securely backup your API keys and credentials to a file, or restore from a previous backup. This is useful when switching browsers or devices. The backup file is encrypted.</p>
+                <div class="settings-controls">
+                    <div class="form-actions">
+                        <button id="export-credentials" type="button">📥 Export Credentials</button>
+                        <button id="import-credentials" type="button">📤 Import Credentials</button>
+                        <input type="file" id="credential-file-input" accept=".json" style="display: none;">
+                    </div>
+                </div>
+                <div id="credential-backup-status" class="api-status-display"></div>
+            </section>
+        </section>
+    </main>
+
+    <dialog id="schedule-details-dialog" class="schedule-details-dialog">
+        <div class="schedule-details-header">
+            <div>
+                <span id="schedule-details-type" class="schedule-details-type"></span>
+                <h3 id="schedule-details-title"></h3>
+            </div>
+            <button id="schedule-details-close" type="button" aria-label="Close details">×</button>
+        </div>
+        <div id="schedule-details-body" class="schedule-details-body"></div>
+    </dialog>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="credentials.js"></script>
+    <script src="script.js?v=9"></script>
+</body>
+</html>
