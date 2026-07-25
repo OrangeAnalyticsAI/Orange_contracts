@@ -92,7 +92,9 @@ class OrangeContractApp {
     }
 
     async initializeAuth() {
+        console.log('Auth callback hash:', window.location.hash);
         const { data: { session }, error } = await this.db.auth.getSession();
+        console.log('getSession result:', { session, error });
         if (error) throw error;
 
         if (!session) {
@@ -122,7 +124,8 @@ class OrangeContractApp {
         button.disabled = true;
         errorElement.textContent = '';
 
-        const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+        const redirectUrl = window.location.origin;
+        console.log('OAuth redirectTo:', redirectUrl);
         const { error } = await this.db.auth.signInWithOAuth({
             provider: 'google',
             options: { redirectTo: redirectUrl }
