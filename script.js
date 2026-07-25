@@ -2097,6 +2097,7 @@ class OrangeContractApp {
             this.showErrorMessage('Please connect to Gmail first');
             return;
         }
+        this._lastSearchExtracted = false;
         const resultsDiv = document.getElementById('gmail-results');
         resultsDiv.classList.remove('hidden');
         resultsDiv.innerHTML = '<div class="gmail-loading">🔍 Searching your Gmail for flight booking confirmations...</div>';
@@ -2359,6 +2360,7 @@ ${body}`;
                     }
                 }
 
+                this._lastSearchExtracted = this._lastSearchExtracted || parsedList.length > 0;
                 parsedList.forEach(b => {
                     const bookingRef = b.bookingRef;
                     const date = b.date;
@@ -2421,6 +2423,7 @@ ${body}`;
             this.showErrorMessage('Please connect to Gmail first');
             return;
         }
+        this._lastSearchExtracted = false;
         const resultsDiv = document.getElementById('gmail-results');
         resultsDiv.classList.remove('hidden');
         resultsDiv.innerHTML = '<div class="gmail-loading">🔍 Searching your Gmail for parking booking confirmations...</div>';
@@ -2575,6 +2578,7 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
                         }
 
                         const parkingDetails = JSON.parse(jsonMatch[0]);
+                        this._lastSearchExtracted = true;
                         logDebug("Gemini successfully extracted parking booking.");
 
                         // Add booking date to details for the import form
@@ -2612,7 +2616,10 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
     renderGmailParkingResults(found) {
         const resultsDiv = document.getElementById('gmail-results');
         if (found.length === 0) {
-            resultsDiv.innerHTML = '<div class="gmail-empty">Found emails but couldn\'t extract parking booking details. Try the manual paste option below.</div>';
+            const message = this._lastSearchExtracted
+                ? 'Found emails but couldn\'t find anything new.'
+                : 'Found emails but couldn\'t extract parking booking details. Try the manual paste option below.';
+            resultsDiv.innerHTML = `<div class="gmail-empty">${message}</div>`;
             return;
         }
         
@@ -3214,7 +3221,10 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
     renderGmailResults(found) {
         const resultsDiv = document.getElementById('gmail-results');
         if (found.length === 0) {
-            resultsDiv.innerHTML = '<div class="gmail-empty">Found emails but couldn\'t extract booking details. Try the manual paste option below.</div>';
+            const message = this._lastSearchExtracted
+                ? 'Found emails but couldn\'t find anything new.'
+                : 'Found emails but couldn\'t extract booking details. Try the manual paste option below.';
+            resultsDiv.innerHTML = `<div class="gmail-empty">${message}</div>`;
             return;
         }
         resultsDiv.innerHTML = `
