@@ -13,6 +13,8 @@ class OrangeContractApp {
         this.parkingBookings = [];
         this.accommodationBookings = [];
         this.transportBookings = [];
+        this.plannedFlights = [];
+        this.fareWatchAlerts = [];
         this.skippedBookings = [];
         this.skippedParkingBookings = [];
         this.selectedDate = null;
@@ -59,6 +61,7 @@ class OrangeContractApp {
         this.renderWeekTable();
         this.updateDashboard();
         this.renderBookings();
+        this.renderFareWatch();
         this.populateLocationDropdown();
         this.initializeFreeAgentDateRange();
         this.updateMonthDisplay();
@@ -69,7 +72,7 @@ class OrangeContractApp {
         // Register Service Worker for PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=10')
+                navigator.serviceWorker.register('./sw.js?v=19')
                     .then(reg => console.log('Service Worker registered successfully:', reg.scope))
                     .catch(err => console.warn('Service Worker registration failed:', err));
             });
@@ -233,7 +236,8 @@ class OrangeContractApp {
                 this.loadParkingFromDB(),
                 this.loadSkippedParkingFromDB(),
                 this.loadAccommodationFromDB(),
-                this.loadTransportFromDB()
+                this.loadTransportFromDB(),
+                this.loadFareWatchData()
             ]);
         } else {
             this.expenses = JSON.parse(localStorage.getItem('orange-contract-expenses') || '{}');
@@ -371,6 +375,22 @@ class OrangeContractApp {
             notes: row.notes
         }));
         this.renderTransport();
+    }
+
+    async loadFareWatchData() {
+        const [{ data: flights, error: flightsError }, { data: alerts, error: alertsError }] = await Promise.all([
+            this.db.from('planned_flights').select('*, flight_price_snapshots(*)').order('outbound_date', { ascending: true }),
+            this.db.from('flight_price_alerts').select('*').eq('is_read', false).order('created_at', { ascending: false }).limit(10)
+        ]);
+        if (flightsError) { console.error('Error loading planned flights:', flightsError); return; }
+        if (alertsError) console.error('Error loading fare alerts:', alertsError);
+        this.plannedFlights = (flights || []).map(flight => ({
+            ...flight,
+            flight_price_snapshots: (flight.flight_price_snapshots || []).sort((a, b) => new Date(a.observed_at) - new Date(b.observed_at))
+        }));
+        this.fareWatchAlerts = alerts || [];
+        this.renderFareWatch();
+        this.showFareWatchNotifications();
     }
 
     // ─── Persist expenses ──────────────────────────────────────────────────────
@@ -515,6 +535,17 @@ class OrangeContractApp {
         document.getElementById('booking-form').addEventListener('submit', (e) => this.handleBookingSubmit(e));
         document.getElementById('cancel-booking-btn').addEventListener('click', () => this.hideBookingForm());
 
+        // Fare Watch
+        document.getElementById('add-planned-flight-btn').addEventListener('click', () => this.showPlannedFlightForm());
+        document.getElementById('cancel-planned-flight-btn').addEventListener('click', () => this.hidePlannedFlightForm());
+        document.getElementById('planned-flight-form').addEventListener('submit', (e) => this.handlePlannedFlightSubmit(e));
+        document.getElementById('check-all-fares-btn').addEventListener('click', (e) => this.checkFarePrices(null, e.currentTarget));
+        document.getElementById('planned-flights-list').addEventListener('click', (e) => this.handleFareWatchAction(e));
+        document.getElementById('fare-watch-alerts').addEventListener('click', (e) => {
+            const button = e.target.closest('[data-alert-id]');
+            if (button) this.dismissFareWatchAlert(button.dataset.alertId);
+        });
+
         // Parking
         document.getElementById('add-parking-btn').addEventListener('click', () => this.showParkingBookingForm());
         document.getElementById('parking-form').addEventListener('submit', (e) => this.handleParkingSubmit(e));
@@ -602,6 +633,7 @@ class OrangeContractApp {
         document.querySelector(`[data-section="${sectionName}"]`).classList.add('active');
 
         if (sectionName === 'schedule') this.renderSchedule();
+        if (sectionName === 'fare-watch') this.renderFareWatch();
     }
 
     changeWeek(direction) {
@@ -1545,6 +1577,363 @@ class OrangeContractApp {
             html += `<div class="previous-bookings-section"><h4>Previous Bookings</h4>${previous.map(b => renderItem(b)).join('')}</div>`;
         }
         container.innerHTML = html;
+    }
+
+    escapeFareWatchHtml(value) {
+        return String(value ?? '').replace(/[&<>'"]/g, character => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        })[character]);
+    }
+
+    showPlannedFlightForm(flight = null) {
+        const form = document.getElementById('planned-flight-form');
+        form.reset();
+        document.getElementById('planned-flight-id').value = flight?.id || '';
+        document.getElementById('planned-flight-form-title').textContent = flight ? 'Edit price watch' : 'Plan a flight';
+        document.getElementById('planned-origin').value = flight?.origin || 'BRS';
+        document.getElementById('planned-destination').value = flight?.destination || 'GLA';
+        document.getElementById('planned-outbound-date').value = flight?.outbound_date || '';
+        document.getElementById('planned-outbound-time').value = flight?.outbound_time?.slice(0, 5) || '';
+        document.getElementById('planned-return-date').value = flight?.return_date || '';
+        document.getElementById('planned-return-time').value = flight?.return_time?.slice(0, 5) || '';
+        document.getElementById('planned-time-flex').value = String(flight?.time_flex_minutes || 90);
+        document.getElementById('planned-target-price').value = flight?.target_price || '';
+        document.getElementById('planned-direct-only').checked = flight ? flight.direct_only : true;
+
+        const today = new Date().toISOString().split('T')[0];
+        const oneYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const outboundDateInput = document.getElementById('planned-outbound-date');
+        const returnDateInput = document.getElementById('planned-return-date');
+        outboundDateInput.min = today;
+        outboundDateInput.max = oneYear;
+        returnDateInput.min = outboundDateInput.value || today;
+        returnDateInput.max = oneYear;
+        outboundDateInput.addEventListener('change', () => {
+            returnDateInput.min = outboundDateInput.value || today;
+            if (returnDateInput.value && returnDateInput.value < outboundDateInput.value) {
+                returnDateInput.value = outboundDateInput.value;
+            }
+        }, { once: true });
+
+        document.getElementById('planned-flight-form-container').classList.remove('hidden');
+        document.getElementById('planned-flight-form-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    hidePlannedFlightForm() {
+        document.getElementById('planned-flight-form-container').classList.add('hidden');
+        document.getElementById('planned-flight-form').reset();
+    }
+
+    async handlePlannedFlightSubmit(event) {
+        event.preventDefault();
+        const id = document.getElementById('planned-flight-id').value;
+        const origin = document.getElementById('planned-origin').value.trim().toUpperCase();
+        const destination = document.getElementById('planned-destination').value.trim().toUpperCase();
+        const outboundDate = document.getElementById('planned-outbound-date').value;
+        const returnDate = document.getElementById('planned-return-date').value || null;
+        const returnTime = document.getElementById('planned-return-time').value || null;
+        if (origin === destination) return this.showErrorMessage('Origin and destination must be different.');
+        if (Boolean(returnDate) !== Boolean(returnTime)) return this.showErrorMessage('Add both a return date and return time, or leave both blank.');
+        if (returnDate && returnDate < outboundDate) return this.showErrorMessage('The return cannot be before the outbound flight.');
+
+        const row = {
+            origin,
+            destination,
+            outbound_date: outboundDate,
+            outbound_time: document.getElementById('planned-outbound-time').value,
+            return_date: returnDate,
+            return_time: returnTime,
+            time_flex_minutes: Number(document.getElementById('planned-time-flex').value),
+            direct_only: document.getElementById('planned-direct-only').checked,
+            target_price: Number(document.getElementById('planned-target-price').value) || null,
+            status: 'tracking',
+            updated_at: new Date().toISOString()
+        };
+        this.setSyncStatus('saving');
+        const request = id
+            ? this.db.from('planned_flights').update(row).eq('id', id).select().single()
+            : this.db.from('planned_flights').insert(row).select().single();
+        const { data, error } = await request;
+        if (error) {
+            console.error(error);
+            this.setSyncStatus('offline');
+            return this.showErrorMessage(`Could not save price watch: ${error.message}`);
+        }
+        this.hidePlannedFlightForm();
+        await this.loadFareWatchData();
+        this.setSyncStatus('connected');
+        this.showSuccessMessage(id ? 'Price watch updated.' : 'Flight saved. Checking the first live fare now…');
+        if (!id) {
+            this.requestFareWatchNotificationPermission();
+            await this.checkFarePrices(data.id);
+        }
+    }
+
+    async handleFareWatchAction(event) {
+        const button = event.target.closest('[data-fare-action]');
+        if (!button) return;
+        const flight = this.plannedFlights.find(item => item.id === button.dataset.flightId);
+        if (!flight) return;
+        const action = button.dataset.fareAction;
+        if (action === 'edit') this.showPlannedFlightForm(flight);
+        if (action === 'check') await this.checkFarePrices(flight.id, button);
+        if (action === 'pause') await this.updatePlannedFlightStatus(flight.id, flight.status === 'paused' ? 'tracking' : 'paused');
+        if (action === 'booked') await this.updatePlannedFlightStatus(flight.id, 'booked');
+        if (action === 'delete') await this.deletePlannedFlight(flight.id);
+    }
+
+    async updatePlannedFlightStatus(id, status) {
+        const { error } = await this.db.from('planned_flights').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+        if (error) return this.showErrorMessage(error.message);
+        await this.loadFareWatchData();
+        this.showSuccessMessage(status === 'booked' ? 'Marked as booked. Daily checks have stopped.' : status === 'paused' ? 'Price watch paused.' : 'Price watch resumed.');
+    }
+
+    async deletePlannedFlight(id) {
+        if (!confirm('Delete this price watch and all of its price history?')) return;
+        const { error } = await this.db.from('planned_flights').delete().eq('id', id);
+        if (error) return this.showErrorMessage(error.message);
+        await this.loadFareWatchData();
+        this.showSuccessMessage('Price watch deleted.');
+    }
+
+    async checkFarePrices(flightId = null, button = null) {
+        const trigger = button || document.getElementById('check-all-fares-btn');
+        const originalText = trigger?.textContent;
+        if (trigger) {
+            trigger.classList.add('button-loading');
+            trigger.textContent = 'Queuing live fare check…';
+            trigger.disabled = true;
+        }
+        try {
+            const { data, error } = await this.db.functions.invoke('monitor-flight-prices', { body: flightId ? { action: 'start', flightId } : { action: 'start' } });
+            if (error) {
+                let message = error.message;
+                try {
+                    const detail = await error.context?.json();
+                    if (detail?.error) message = detail.error;
+                } catch (_) {}
+                throw new Error(message);
+            }
+            const started = (data?.started || []).filter((result) => result.ok !== false);
+            const failures = (data?.started || []).filter((result) => result.ok === false);
+            if (failures.length) this.showErrorMessage(failures.map((result) => result.error).join(' '));
+            if (!started.length && !failures.length) {
+                this.showSuccessMessage('No tracking flights need a fare check right now.');
+                return;
+            }
+            if (started.length) {
+                await this.pollFareWatch({ flightId, trigger, originalText });
+            }
+        } catch (error) {
+            console.error('Fare check failed:', error);
+            const status = document.getElementById('fare-watch-settings-status');
+            if (status) {
+                status.textContent = error.message;
+                status.className = 'api-status-display error';
+            }
+            this.showErrorMessage(`Fare check failed: ${error.message}`);
+            if (trigger) {
+                trigger.classList.remove('button-loading');
+                trigger.textContent = originalText;
+                trigger.disabled = false;
+            }
+        }
+    }
+
+    async pollFareWatch({ flightId = null, trigger = null, originalText = null, maxAttempts = 30 } = {}) {
+        const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+        let attempts = 0;
+        let done = false;
+        let message = '';
+
+        while (attempts < maxAttempts && !done) {
+            attempts++;
+            if (trigger) trigger.textContent = `Checking easyJet (${attempts}/${maxAttempts})…`;
+            await wait(15000);
+            try {
+                const { data, error } = await this.db.functions.invoke('monitor-flight-prices', { body: flightId ? { action: 'poll', flightId } : { action: 'poll' } });
+                if (error) throw new Error(error.message);
+                const processed = data?.processed || [];
+                const stillPending = data?.stillPending || [];
+                const successes = processed.filter((result) => result.ok);
+                if (successes.length) {
+                    await this.loadFareWatchData();
+                    message = `${successes.length} fare ${successes.length === 1 ? 'watch' : 'watches'} updated.`;
+                }
+                if (flightId) {
+                    const thisFlight = processed.find((result) => result.id === flightId);
+                    if (thisFlight) {
+                        if (!thisFlight.ok) this.showErrorMessage(thisFlight.error);
+                        done = true;
+                    } else if (!stillPending.some((result) => result.id === flightId)) {
+                        done = true;
+                    }
+                } else {
+                    done = stillPending.length === 0;
+                }
+            } catch (err) {
+                console.error('Fare poll failed:', err);
+                message = `Poll failed: ${err.message}`;
+                done = true;
+            }
+        }
+
+        if (!done && !message) message = 'EasyJet scrape is still running; results will refresh automatically.';
+        if (message) this.showSuccessMessage(message);
+        if (trigger) {
+            trigger.classList.remove('button-loading');
+            trigger.textContent = originalText;
+            trigger.disabled = false;
+        }
+        await this.loadFareWatchData();
+    }
+
+    renderFareWatch() {
+        const container = document.getElementById('planned-flights-list');
+        if (!container) return;
+        this.renderFareWatchAlerts();
+        const tracked = this.plannedFlights.filter(flight => flight.status === 'tracking');
+        document.getElementById('fare-stat-tracked').textContent = tracked.length;
+        document.getElementById('fare-stat-book-now').textContent = tracked.filter(flight => flight.recommendation === 'book_now').length;
+        const savings = tracked.map(flight => {
+            const prices = (flight.flight_price_snapshots || []).map(snapshot => Number(snapshot.total_price));
+            return prices.length && flight.latest_total_price ? Math.max(...prices) - Number(flight.latest_total_price) : 0;
+        });
+        const bestSaving = Math.max(0, ...savings);
+        document.getElementById('fare-stat-saving').textContent = bestSaving > 0 ? this.formatCurrency(bestSaving) : '—';
+        const checks = tracked.map(flight => flight.last_checked_at).filter(Boolean).sort().reverse();
+        document.getElementById('fare-stat-last-scan').textContent = checks.length ? this.formatRelativeFareWatchTime(checks[0]) : 'Not yet';
+        if (!this.plannedFlights.length) {
+            container.innerHTML = '<div class="fare-watch-empty">No flights are being watched yet. Plan a trip to start building daily price intelligence.</div>';
+            return;
+        }
+        const rank = { tracking: 0, paused: 1, booked: 2 };
+        container.innerHTML = [...this.plannedFlights]
+            .sort((a, b) => rank[a.status] - rank[b.status] || a.outbound_date.localeCompare(b.outbound_date))
+            .map(flight => this.renderPlannedFlightCard(flight)).join('');
+    }
+
+    renderPlannedFlightCard(flight) {
+        const safe = value => this.escapeFareWatchHtml(value);
+        const recommendationClass = flight.status === 'paused' ? 'paused' : (flight.recommendation || 'watch').replaceAll('_', '-');
+        const recommendationLabel = flight.status === 'booked' ? 'Booked' : flight.status === 'paused' ? 'Paused' : ({
+            book_now: 'Book now', consider_booking: 'Consider booking', watch: 'Keep watching', unavailable: 'Fare unavailable', new: 'New watch'
+        })[flight.recommendation] || 'New watch';
+        const returnText = flight.return_date ? `<span>Return ${safe(this.formatDateUK(flight.return_date))} at ${safe(flight.return_time?.slice(0, 5))}</span>` : '<span>One way</span>';
+        const fare = flight.latest_total_price ? this.formatCurrency(flight.latest_total_price) : 'Awaiting fare';
+        const latestSnapshot = flight.flight_price_snapshots?.at(-1);
+        const outTime = latestSnapshot?.outbound_actual_time ? safe(latestSnapshot.outbound_actual_time.slice(0, 5)) : safe(flight.outbound_time?.slice(0, 5));
+        const retTime = latestSnapshot?.return_actual_time ? safe(latestSnapshot.return_actual_time.slice(0, 5)) : safe(flight.return_time?.slice(0, 5));
+        const legs = flight.latest_total_price
+            ? (flight.latest_return_price
+                ? `Outbound ${outTime} · ${this.formatCurrency(flight.latest_outbound_price)} · Return ${retTime} · ${this.formatCurrency(flight.latest_return_price)}`
+                : `Outbound ${outTime} · ${this.formatCurrency(flight.latest_outbound_price)}`)
+            : safe(flight.last_error || 'Run the first live price check');
+        const reasons = Array.isArray(flight.recommendation_reasons) ? flight.recommendation_reasons : [];
+        const events = Array.isArray(flight.event_insights) ? flight.event_insights : [];
+        const sources = Array.isArray(flight.event_sources) ? flight.event_sources : [];
+        const bookingLink = latestSnapshot?.booking_url?.startsWith('https://')
+            ? `<a class="settings-link-button" href="${safe(latestSnapshot.booking_url)}" target="_blank" rel="noopener">View on easyJet</a>` : '';
+        return `<article class="planned-flight-card ${recommendationClass} ${safe(flight.status)}">
+            <header class="planned-flight-card-header">
+                <div>
+                    <div class="planned-route">${safe(flight.origin)} <span>→</span> ${safe(flight.destination)}</div>
+                    <div class="planned-flight-meta"><span>Out ${safe(this.formatDateUK(flight.outbound_date))} at ${safe(flight.outbound_time?.slice(0, 5))}</span>${returnText}<span>±${safe(flight.time_flex_minutes)} min</span></div>
+                </div>
+                <span class="recommendation-badge ${recommendationClass}">${recommendationLabel}</span>
+            </header>
+            <div class="planned-flight-card-body">
+                <div class="fare-summary">
+                    <span class="current-fare-label">Current total</span>
+                    <strong class="current-fare">${fare}</strong>
+                    <div class="fare-legs">${legs}</div>
+                    <div class="fare-disclaimer">Prices from Apify easyJet scraper — may differ from live checkout.</div>
+                    <div class="planned-flight-price-row"><span class="fare-trend ${safe(flight.trend)}">${this.fareTrendLabel(flight.trend)}</span>${flight.lowest_total_price ? `<span class="fare-legs">Low ${this.formatCurrency(flight.lowest_total_price)}</span>` : ''}</div>
+                    <div class="recommendation-panel">
+                        <strong>${safe(flight.recommendation_summary || 'Building your recommendation')}</strong>
+                        <ul>${reasons.length ? reasons.map(reason => `<li>${safe(reason)}</li>`).join('') : '<li>Daily observations will reveal whether the fare is rising or falling.</li>'}</ul>
+                    </div>
+                </div>
+                ${this.renderFarePriceChart(flight.flight_price_snapshots || [], flight.id)}
+            </div>
+            <details class="event-intelligence">
+                <summary>Gemini demand intelligence · ${events.length} ${events.length === 1 ? 'factor' : 'factors'} found</summary>
+                <div class="event-list">${events.length ? events.map(item => `<div class="event-item"><span class="event-risk ${safe(item.risk)}">${safe(item.risk || 'info')}</span><div><strong>${safe(item.name)}</strong> · ${safe(item.date)} · ${safe(item.location)}<br>${safe(item.impact)}</div></div>`).join('') : '<div class="fare-legs">No significant researched demand factors are stored yet. Gemini research runs when its server-side key is configured.</div>'}</div>
+                ${sources.length ? `<div class="event-sources">Sources: ${sources.map(source => source.url?.startsWith('https://') ? `<a href="${safe(source.url)}" target="_blank" rel="noopener">${safe(source.title)}</a>` : '').join('')}</div>` : ''}
+            </details>
+            <footer class="planned-flight-card-footer">
+                <span class="last-checked">${flight.last_checked_at ? `Checked ${safe(this.formatRelativeFareWatchTime(flight.last_checked_at))}` : 'Not checked yet'}${flight.target_price ? ` · Target ${this.formatCurrency(flight.target_price)}` : ''}</span>
+                <div class="planned-flight-actions">
+                    ${bookingLink}
+                    ${flight.status !== 'booked' ? `<button data-fare-action="check" data-flight-id="${safe(flight.id)}">Check now</button><button data-fare-action="edit" data-flight-id="${safe(flight.id)}">Edit</button><button class="secondary-btn" data-fare-action="pause" data-flight-id="${safe(flight.id)}">${flight.status === 'paused' ? 'Resume' : 'Pause'}</button><button class="secondary-btn" data-fare-action="booked" data-flight-id="${safe(flight.id)}">Mark booked</button>` : ''}
+                    <button class="danger" data-fare-action="delete" data-flight-id="${safe(flight.id)}">Delete</button>
+                </div>
+            </footer>
+        </article>`;
+    }
+
+    renderFarePriceChart(snapshots, flightId) {
+        if (!snapshots.length) return '<div class="price-chart-wrap"><div class="price-chart-heading"><span>Price history</span></div><div class="price-chart-empty">The first daily observation will appear here.</div></div>';
+        const prices = snapshots.map(snapshot => Number(snapshot.total_price));
+        const minimum = Math.min(...prices);
+        const maximum = Math.max(...prices);
+        const spread = Math.max(maximum - minimum, 10);
+        const points = prices.map((price, index) => {
+            const x = snapshots.length === 1 ? 50 : 4 + (index / (snapshots.length - 1)) * 92;
+            const y = 112 - ((price - minimum) / spread) * 94;
+            return { x, y, price, snapshot: snapshots[index] };
+        });
+        const path = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
+        const areaPath = `${path} L ${points.at(-1).x.toFixed(1)} 124 L ${points[0].x.toFixed(1)} 124 Z`;
+        const gradientId = `fare-gradient-${flightId.replaceAll('-', '')}`;
+        const labels = `${this.formatDateUK(snapshots[0].observed_on)} → ${this.formatDateUK(snapshots.at(-1).observed_on)}`;
+        return `<div class="price-chart-wrap">
+            <div class="price-chart-heading"><span>Price history · ${snapshots.length} ${snapshots.length === 1 ? 'day' : 'days'}</span><span>${labels}</span></div>
+            <svg class="price-chart" viewBox="0 0 100 128" preserveAspectRatio="none" role="img" aria-label="Fare price history from ${this.formatCurrency(prices[0])} to ${this.formatCurrency(prices.at(-1))}">
+                <defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5b800"/><stop offset="1" stop-color="#f5b800" stop-opacity="0"/></linearGradient></defs>
+                <path class="price-chart-area" fill="url(#${gradientId})" d="${areaPath}"></path><path class="price-chart-line" d="${path}"></path>
+                ${points.map(point => `<circle class="price-chart-dot" cx="${point.x}" cy="${point.y}" r="1.8"><title>${this.formatCurrency(point.price)} on ${this.formatDateUK(point.snapshot.observed_on)}</title></circle>`).join('')}
+            </svg>
+        </div>`;
+    }
+
+    fareTrendLabel(trend) {
+        return ({ falling: '↓ Falling', rising: '↑ Rising', steady: '→ Steady', new: '• New watch' })[trend] || '• New watch';
+    }
+
+    formatRelativeFareWatchTime(value) {
+        const date = new Date(value);
+        const difference = Date.now() - date.getTime();
+        if (difference < 60000) return 'just now';
+        if (difference < 3600000) return `${Math.floor(difference / 60000)}m ago`;
+        if (difference < 86400000) return `${Math.floor(difference / 3600000)}h ago`;
+        return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    }
+
+    renderFareWatchAlerts() {
+        const container = document.getElementById('fare-watch-alerts');
+        if (!container) return;
+        container.innerHTML = this.fareWatchAlerts.map(alert => `<div class="fare-alert"><div><strong>${this.escapeFareWatchHtml(alert.title)}</strong><p>${this.escapeFareWatchHtml(alert.message)}</p></div><button type="button" data-alert-id="${this.escapeFareWatchHtml(alert.id)}" aria-label="Dismiss alert">×</button></div>`).join('');
+    }
+
+    async dismissFareWatchAlert(id) {
+        const { error } = await this.db.from('flight_price_alerts').update({ is_read: true }).eq('id', id);
+        if (error) return this.showErrorMessage(error.message);
+        this.fareWatchAlerts = this.fareWatchAlerts.filter(alert => alert.id !== id);
+        this.renderFareWatchAlerts();
+    }
+
+    async requestFareWatchNotificationPermission() {
+        if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
+    }
+
+    showFareWatchNotifications() {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        const shown = JSON.parse(localStorage.getItem('orange-contract-fare-alerts-shown') || '[]');
+        const unseen = this.fareWatchAlerts.filter(alert => !shown.includes(alert.id));
+        unseen.forEach(alert => new Notification(alert.title, { body: alert.message, tag: alert.id }));
+        if (unseen.length) localStorage.setItem('orange-contract-fare-alerts-shown', JSON.stringify([...shown, ...unseen.map(alert => alert.id)].slice(-50)));
     }
 
     // ─── Gmail API ─────────────────────────────────────────────────────────────

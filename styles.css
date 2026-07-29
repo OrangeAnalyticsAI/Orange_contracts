@@ -546,6 +546,13 @@ main {
     transition: border-color 0.2s;
 }
 
+.form-group input[type="date"]::-webkit-calendar-picker-indicator,
+.form-group input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.7;
+    cursor: pointer;
+}
+
 .form-group input:focus,
 .form-group select:focus {
     outline: none;
@@ -1681,8 +1688,238 @@ main {
     overflow-wrap: anywhere;
 }
 
+.fare-watch-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    padding: 2.2rem;
+    background: linear-gradient(135deg, #14243a 0%, #0a1525 65%, #25170b 100%);
+    border: 1px solid var(--border-lt);
+    border-top: 4px solid var(--orange);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+}
+
+.fare-watch-kicker {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: var(--amber);
+    font: 0.72rem 'Share Tech Mono', monospace;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+
+.fare-watch-hero h2 {
+    color: var(--cream);
+    font: 400 2.8rem 'Bebas Neue', sans-serif;
+    letter-spacing: 5px;
+}
+
+.fare-watch-hero p {
+    max-width: 720px;
+    color: var(--cream-dim);
+    line-height: 1.65;
+}
+
+.fare-watch-hero-actions,
+.planned-flight-actions,
+.alert-actions {
+    display: flex;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+}
+
+.fare-watch-hero-actions button,
+.planned-flight-actions button,
+.alert-actions button,
+.settings-link-button {
+    border: 1px solid var(--orange);
+    padding: 0.65rem 1rem;
+    background: var(--orange);
+    color: #fff;
+    font: 1rem 'Bebas Neue', sans-serif;
+    letter-spacing: 1.5px;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.fare-watch-hero-actions .secondary-btn,
+.planned-flight-actions .secondary-btn,
+.alert-actions button {
+    background: transparent;
+    color: var(--cream-dim);
+    border-color: var(--border-lt);
+}
+
+.fare-watch-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.fare-stat {
+    padding: 1.1rem 1.25rem;
+    background: var(--tile-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--amber-dim);
+}
+
+.fare-stat span {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: var(--muted);
+    font-size: 0.7rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+}
+
+.fare-stat strong {
+    color: var(--cream);
+    font: 1.3rem 'Share Tech Mono', monospace;
+}
+
+.planned-flight-form-container {
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    background: var(--panel);
+    border: 1px solid var(--border-lt);
+    border-left: 4px solid var(--orange);
+}
+
+.planned-form-heading,
+.planned-flight-card-header,
+.planned-flight-price-row,
+.planned-flight-meta,
+.planned-flight-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.planned-form-heading h3,
+.planned-route {
+    color: var(--cream);
+    font: 400 1.75rem 'Bebas Neue', sans-serif;
+    letter-spacing: 3px;
+}
+
+.icon-close {
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 1.8rem;
+    cursor: pointer;
+}
+
+.route-builder {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    max-width: 430px;
+    margin: 1rem 0 1.25rem;
+}
+
+.airport-field { flex: 1; }
+.airport-field input { text-transform: uppercase; font: 1.25rem 'Share Tech Mono', monospace; letter-spacing: 3px; }
+.route-arrow { padding-bottom: 0.75rem; color: var(--orange); font-size: 1.5rem; }
+.planned-leg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.planned-leg { padding: 1rem; background: var(--card-bg); border: 1px solid var(--border); }
+.leg-label { display: block; margin-bottom: 0.75rem; color: var(--amber); font: 1rem 'Bebas Neue', sans-serif; letter-spacing: 2px; }
+.leg-label small { color: var(--muted); font: 0.65rem 'Inter', sans-serif; letter-spacing: 0; }
+.planned-options { margin-top: 1rem; align-items: end; }
+.checkbox-option label { display: flex; align-items: center; min-height: 42px; gap: 0.6rem; color: var(--cream-dim); }
+.checkbox-option input { width: auto; }
+.planned-form-help { align-self: center; color: var(--muted); font-size: 0.8rem; }
+
+.planned-flight-card {
+    margin-bottom: 1rem;
+    overflow: hidden;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--border-lt);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.planned-flight-card.book-now { border-left-color: var(--green); }
+.planned-flight-card.consider-booking { border-left-color: var(--amber); }
+.planned-flight-card.unavailable { border-left-color: var(--red); }
+.planned-flight-card.paused { opacity: 0.68; }
+.planned-flight-card-header { padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--border); }
+.planned-flight-meta { justify-content: flex-start; flex-wrap: wrap; color: var(--cream-dim); font: 0.82rem 'Share Tech Mono', monospace; }
+.planned-flight-meta span + span::before { content: '•'; margin-right: 1rem; color: var(--border-lt); }
+.recommendation-badge { padding: 0.35rem 0.6rem; border: 1px solid var(--border-lt); color: var(--muted); font: 0.78rem 'Share Tech Mono', monospace; text-transform: uppercase; }
+.recommendation-badge.book-now { border-color: var(--green); color: var(--green); }
+.recommendation-badge.consider-booking { border-color: var(--amber); color: var(--amber); }
+.recommendation-badge.unavailable { border-color: var(--red); color: var(--red); }
+
+.planned-flight-card-body { display: grid; grid-template-columns: minmax(220px, 0.75fr) minmax(300px, 1.25fr); gap: 1.5rem; padding: 1.25rem; }
+.current-fare-label { color: var(--muted); font-size: 0.7rem; letter-spacing: 1.5px; text-transform: uppercase; }
+.current-fare { display: block; margin: 0.3rem 0; color: var(--green); font: 2.3rem 'Share Tech Mono', monospace; }
+.fare-legs { color: var(--cream-dim); font-size: 0.78rem; line-height: 1.5; }
+.fare-disclaimer { color: var(--muted); font-size: 0.7rem; font-style: italic; margin-top: 0.3rem; }
+.fare-trend { font: 0.85rem 'Share Tech Mono', monospace; }
+.fare-trend.falling { color: var(--green); }
+.fare-trend.rising { color: var(--red); }
+.fare-trend.steady, .fare-trend.new { color: var(--muted); }
+.recommendation-panel { margin-top: 1rem; padding: 0.85rem; background: var(--tile-bg); border: 1px solid var(--border); }
+.recommendation-panel strong { display: block; margin-bottom: 0.45rem; color: var(--amber); }
+.recommendation-panel ul { padding-left: 1.1rem; color: var(--cream-dim); font-size: 0.8rem; line-height: 1.55; }
+
+.price-chart-wrap { min-width: 0; }
+.price-chart-heading { display: flex; justify-content: space-between; margin-bottom: 0.7rem; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; }
+.price-chart { width: 100%; height: 128px; overflow: visible; background: repeating-linear-gradient(to bottom, transparent 0, transparent 31px, rgba(39, 64, 96, 0.45) 32px); border-bottom: 1px solid var(--border-lt); }
+.price-chart-line { fill: none; stroke: var(--amber); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.price-chart-area { fill: url(#fareGradient); opacity: 0.45; }
+.price-chart-dot { fill: var(--orange); stroke: var(--navy-deep); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.price-chart-empty { display: grid; place-items: center; height: 128px; color: var(--muted); border: 1px dashed var(--border); font-size: 0.8rem; }
+
+.event-intelligence { padding: 1rem 1.25rem; background: #0a1422; border-top: 1px solid var(--border); }
+.event-intelligence summary { color: var(--cream); font: 1rem 'Bebas Neue', sans-serif; letter-spacing: 2px; cursor: pointer; }
+.event-list { display: grid; gap: 0.55rem; margin-top: 0.8rem; }
+.event-item { display: grid; grid-template-columns: auto 1fr; gap: 0.65rem; color: var(--cream-dim); font-size: 0.8rem; line-height: 1.5; }
+.event-risk { align-self: start; padding: 0.15rem 0.35rem; border: 1px solid var(--border-lt); color: var(--muted); font: 0.65rem 'Share Tech Mono', monospace; text-transform: uppercase; }
+.event-risk.high { border-color: var(--red); color: var(--red); }
+.event-risk.medium { border-color: var(--amber); color: var(--amber); }
+.event-sources { margin-top: 0.7rem; font-size: 0.72rem; }
+.event-sources a { margin-right: 0.75rem; color: var(--muted); }
+.planned-flight-card-footer { padding: 0.85rem 1.25rem; border-top: 1px solid var(--border); }
+.last-checked { color: var(--muted); font-size: 0.72rem; }
+.planned-flight-actions button { padding: 0.35rem 0.65rem; font-size: 0.8rem; }
+.planned-flight-actions .danger { color: var(--red); border-color: #633; background: transparent; }
+.fare-watch-empty { padding: 3rem 1rem; text-align: center; color: var(--muted); border: 1px dashed var(--border-lt); }
+
+.fare-watch-alerts { display: grid; gap: 0.6rem; margin-bottom: 1rem; }
+.fare-alert { display: flex; justify-content: space-between; gap: 1rem; padding: 0.9rem 1rem; background: #10251d; border: 1px solid #21583f; border-left: 4px solid var(--green); }
+.fare-alert strong { display: block; margin-bottom: 0.25rem; color: var(--green); }
+.fare-alert p { color: var(--cream-dim); font-size: 0.8rem; line-height: 1.45; }
+.fare-alert button { align-self: center; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.fare-watch-setup-list { display: grid; gap: 0.5rem; margin-bottom: 1rem; color: var(--cream-dim); font-size: 0.85rem; }
+.fare-watch-setup-list code { color: var(--amber); }
+.settings-link-button { display: inline-block; margin-bottom: 1rem; }
+.button-loading { pointer-events: none; opacity: 0.65; }
+
+@media (max-width: 900px) {
+    .fare-watch-stats { grid-template-columns: 1fr 1fr; }
+    .planned-flight-card-body { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 768px) {
     main { padding: 0 1rem; }
+
+    .fare-watch-hero { align-items: stretch; flex-direction: column; padding: 1.4rem; }
+    .fare-watch-hero-actions button { flex: 1; }
+    .fare-watch-stats, .planned-leg-grid { grid-template-columns: 1fr; }
+    .planned-flight-card-header, .planned-flight-price-row, .planned-flight-card-footer { align-items: flex-start; flex-direction: column; }
+    .planned-flight-card-body { padding: 1rem; }
+    .planned-options { display: grid; grid-template-columns: 1fr; }
+    .route-builder { max-width: none; }
+    .planned-flight-actions { width: 100%; }
+    .planned-flight-actions button { flex: 1; }
+    .fare-alert { align-items: flex-start; }
+
 
     .dashboard-cards { grid-template-columns: 1fr; }
 

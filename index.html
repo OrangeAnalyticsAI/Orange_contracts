@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Orange Contract - Weekly Travel Expense Tracker</title>
-    <link rel="stylesheet" href="styles.css?v=10">
+    <link rel="stylesheet" href="styles.css?v=19">
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff6b35">
@@ -36,6 +36,7 @@
             <button class="nav-btn" data-section="schedule">Schedule</button>
             <button class="nav-btn" data-section="monthly">Monthly</button>
             <button class="nav-btn" data-section="bookings">Flights</button>
+            <button class="nav-btn" data-section="fare-watch">Fare Watch</button>
             <button class="nav-btn" data-section="parking">Parking</button>
             <button class="nav-btn" data-section="accommodation">Accommodation</button>
             <button class="nav-btn" data-section="transport">Transport</button>
@@ -215,6 +216,123 @@
                     </table>
                 </div>
             </section>
+        </section>
+
+        <section id="fare-watch-section" class="content-section">
+            <section class="fare-watch-hero">
+                <div>
+                    <span class="fare-watch-kicker">Daily price intelligence</span>
+                    <h2>Fare Watch</h2>
+                    <p>Track the exact flights you want. Daily fare checks build a price history while Gemini researches holidays and major events that could push demand up.</p>
+                </div>
+                <div class="fare-watch-hero-actions">
+                    <button id="check-all-fares-btn" type="button">Check prices now</button>
+                    <button id="add-planned-flight-btn" type="button" class="secondary-btn">+ Plan a flight</button>
+                </div>
+            </section>
+
+            <div id="fare-watch-alerts" class="fare-watch-alerts"></div>
+
+            <section class="fare-watch-stats" aria-label="Fare watch summary">
+                <div class="fare-stat">
+                    <span>Trips tracked</span>
+                    <strong id="fare-stat-tracked">0</strong>
+                </div>
+                <div class="fare-stat">
+                    <span>Book now</span>
+                    <strong id="fare-stat-book-now">0</strong>
+                </div>
+                <div class="fare-stat">
+                    <span>Best saving</span>
+                    <strong id="fare-stat-saving">—</strong>
+                </div>
+                <div class="fare-stat">
+                    <span>Last daily scan</span>
+                    <strong id="fare-stat-last-scan">Not yet</strong>
+                </div>
+            </section>
+
+            <section id="planned-flight-form-container" class="planned-flight-form-container hidden">
+                <div class="planned-form-heading">
+                    <div>
+                        <span class="fare-watch-kicker">New price watch</span>
+                        <h3 id="planned-flight-form-title">Plan a flight</h3>
+                    </div>
+                    <button id="cancel-planned-flight-btn" type="button" class="icon-close" aria-label="Close">×</button>
+                </div>
+                <form id="planned-flight-form">
+                    <input type="hidden" id="planned-flight-id">
+                    <div class="route-builder">
+                        <div class="form-group airport-field">
+                            <label for="planned-origin">From</label>
+                            <input type="text" id="planned-origin" maxlength="3" pattern="[A-Za-z]{3}" value="BRS" placeholder="BRS" required>
+                        </div>
+                        <span class="route-arrow" aria-hidden="true">→</span>
+                        <div class="form-group airport-field">
+                            <label for="planned-destination">To</label>
+                            <input type="text" id="planned-destination" maxlength="3" pattern="[A-Za-z]{3}" value="GLA" placeholder="GLA" required>
+                        </div>
+                    </div>
+                    <div class="planned-leg-grid">
+                        <div class="planned-leg">
+                            <span class="leg-label">Outbound</span>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="planned-outbound-date">Date</label>
+                                    <input type="date" id="planned-outbound-date" required onfocus="this.showPicker && this.showPicker()">
+                                </div>
+                                <div class="form-group">
+                                    <label for="planned-outbound-time">Departure time</label>
+                                    <input type="time" id="planned-outbound-time" required onfocus="this.showPicker && this.showPicker()">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="planned-leg">
+                            <span class="leg-label">Return <small>optional</small></span>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="planned-return-date">Date</label>
+                                    <input type="date" id="planned-return-date" onfocus="this.showPicker && this.showPicker()">
+                                </div>
+                                <div class="form-group">
+                                    <label for="planned-return-time">Departure time</label>
+                                    <input type="time" id="planned-return-time" onfocus="this.showPicker && this.showPicker()">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row planned-options">
+                        <div class="form-group">
+                            <label for="planned-time-flex">Time flexibility</label>
+                            <select id="planned-time-flex">
+                                <option value="30">± 30 minutes</option>
+                                <option value="60">± 1 hour</option>
+                                <option value="90" selected>± 1½ hours</option>
+                                <option value="120">± 2 hours</option>
+                                <option value="180">± 3 hours</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="planned-target-price">Book at or below (£)</label>
+                            <input type="number" id="planned-target-price" min="0" step="1" placeholder="e.g. 85">
+                        </div>
+                        <div class="form-group checkbox-option">
+                            <label for="planned-direct-only">
+                                <input type="checkbox" id="planned-direct-only" checked>
+                                Direct flights only
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit">Start tracking</button>
+                        <span class="planned-form-help">The first live fare check runs after saving.</span>
+                    </div>
+                </form>
+            </section>
+
+            <div id="planned-flights-list" class="planned-flights-list">
+                <div class="fare-watch-empty">No flights are being watched yet.</div>
+            </div>
         </section>
 
         <!-- Bookings Section -->
@@ -585,6 +703,19 @@
                 </div>
             </section>
 
+            <section class="settings-panel">
+                <h3>✈️ Fare Watch Automation</h3>
+                <p class="settings-help">Live easyJet fares are fetched by Apify's easyJet-only scraper. Each scrape is queued, runs in the background for 30–60 seconds, and is polled every minute by cron. You pay per result (about £0.002 each), and the free $5 monthly Apify credit is usually plenty for daily checks. Gemini adds grounded research about school holidays and major events. Only the Gemini and email keys are ever sent to the browser if you choose to save them; the Apify token and cron stay in Supabase.</p>
+                <div class="fare-watch-setup-list">
+                    <span><strong>Flight prices:</strong> <code>APIFY_API_TOKEN</code> (free $5/mo credit; then pay per fare option)</span>
+                    <span><strong>Recommended:</strong> <code>GEMINI_API_KEY</code> (for event/demand intelligence)</span>
+                    <span><strong>Daily schedule:</strong> Already handled — no extra key needed</span>
+                    <span><strong>Optional email:</strong> <code>RESEND_API_KEY</code> and <code>ALERT_EMAIL</code></span>
+                </div>
+                <a class="settings-link-button" href="https://supabase.com/dashboard/project/jqfnlcdcxcydqwufgwpm/functions/secrets" target="_blank" rel="noopener">Open secure function settings</a>
+                <div id="fare-watch-settings-status" class="api-status-display">Add a planned flight in Fare Watch and press “Check prices now” to queue a live easyJet scrape. Results appear within 1–2 minutes. GEMINI_API_KEY adds the school-holiday and event research.</div>
+            </section>
+
             <!-- Gemini AI Setup -->
             <section class="settings-panel">
                 <h3>🧠 Gemini AI Integration</h3>
@@ -729,6 +860,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="credentials.js"></script>
-    <script src="script.js?v=10"></script>
+    <script src="script.js?v=19"></script>
 </body>
 </html>
