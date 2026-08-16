@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Orange Contract - Weekly Travel Expense Tracker</title>
-    <link rel="stylesheet" href="styles.css?v=19">
+    <link rel="stylesheet" href="styles.css?v=30">
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff6b35">
@@ -33,16 +33,22 @@
         <p>Weekly Travel Expense Tracker for Scotland</p>
         <nav class="main-nav">
             <button class="nav-btn active" data-section="dashboard">Weekly</button>
-            <button class="nav-btn" data-section="schedule">Schedule</button>
             <button class="nav-btn" data-section="monthly">Monthly</button>
-            <button class="nav-btn" data-section="bookings">Flights</button>
+            <button class="nav-btn" data-section="schedule">Schedule</button>
             <button class="nav-btn" data-section="fare-watch">Fare Watch</button>
-            <button class="nav-btn" data-section="parking">Parking</button>
-            <button class="nav-btn" data-section="accommodation">Accommodation</button>
-            <button class="nav-btn" data-section="transport">Transport</button>
+            <button id="nav-hamburger" class="nav-hamburger" type="button" aria-label="More sections" aria-expanded="false" aria-controls="nav-secondary">☰</button>
+            <div class="nav-secondary" id="nav-secondary">
+                <button class="nav-btn" data-section="bookings">Flights</button>
+                <button class="nav-btn" data-section="parking">Parking</button>
+                <button class="nav-btn" data-section="accommodation">Accommodation</button>
+                <button class="nav-btn" data-section="transport">Transport</button>
+                <button class="nav-btn" data-section="import">Import Email</button>
+            </div>
+            <button class="nav-btn nav-settings" data-section="settings" id="settings-nav-btn" aria-label="Settings">
+                <span class="nav-label">Settings</span>
+                <span class="nav-icon" aria-hidden="true">⚙</span>
+            </button>
             <button class="nav-btn hidden" data-section="freeagent">FreeAgent</button>
-            <button class="nav-btn" data-section="import">Import Email</button>
-            <button class="nav-btn" data-section="settings">Settings</button>
         </nav>
         <div class="header-status">
             <div id="sync-status" class="sync-status">⏳ Connecting...</div>
@@ -414,7 +420,10 @@
             <section class="bookings-panel">
                 <div class="bookings-header">
                     <h3>Car Park Bookings</h3>
-                    <button id="add-parking-btn">+ Add Parking</button>
+                    <div>
+                        <a class="settings-link-button" href="https://parking.bristolairport.co.uk/bristolcustregcr/bristol/bristolCustomerLogin.aspx" target="_blank" rel="noopener">Bristol Airport Parking - My account</a>
+                        <button id="add-parking-btn">+ Add Parking</button>
+                    </div>
                 </div>
 
                 <!-- Add/Edit Parking Form -->
@@ -860,6 +869,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="credentials.js"></script>
-    <script src="script.js?v=19"></script>
+    <script src="script.js?v=30"></script>
 </body>
 </html>

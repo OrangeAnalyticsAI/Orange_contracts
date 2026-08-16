@@ -383,10 +383,12 @@ async function updateFlightWithPrices(admin: any, flight: any, outbound: any, in
   if (updateError) throw updateError;
 
   let alertType = "";
-  if (flight.target_price && total <= Number(flight.target_price)) alertType = "target_reached";
-  else if (decision.recommendation === "book_now" && flight.recommendation !== "book_now") alertType = "book_now";
-  else if (decision.change <= -5) alertType = "price_drop";
-  else if (decision.change >= 8) alertType = "price_rise";
+  if (flight.status !== "booked") {
+    if (flight.target_price && total <= Number(flight.target_price)) alertType = "target_reached";
+    else if (decision.recommendation === "book_now" && flight.recommendation !== "book_now") alertType = "book_now";
+    else if (decision.change <= -5) alertType = "price_drop";
+    else if (decision.change >= 8) alertType = "price_rise";
+  }
   if (alertType) {
     const today = todayIso();
     const { data: existing } = await admin.from("flight_price_alerts").select("id").eq("planned_flight_id", flight.id).eq("alert_type", alertType).gte("created_at", `${today}T00:00:00Z`).limit(1);
@@ -404,7 +406,7 @@ async function handleStart(admin: any, body: any) {
   const token = Deno.env.get("APIFY_API_TOKEN");
   if (!token) return json({ error: "APIFY_API_TOKEN is not configured" }, 500);
 
-  let query = admin.from("planned_flights").select("*").eq("status", "tracking").gte("outbound_date", todayIso()).is("apify_run_id", null);
+  let query = admin.from("planned_flights").select("*").in("status", ["tracking", "booked"]).gte("outbound_date", todayIso()).is("apify_run_id", null);
   if (body.flightId) query = query.eq("id", body.flightId);
   const { data: flights, error: flightsError } = await query.order("outbound_date");
   if (flightsError) throw flightsError;

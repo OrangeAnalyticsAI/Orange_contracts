@@ -72,7 +72,7 @@ class OrangeContractApp {
         // Register Service Worker for PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js?v=19')
+                navigator.serviceWorker.register('./sw.js?v=30')
                     .then(reg => console.log('Service Worker registered successfully:', reg.scope))
                     .catch(err => console.warn('Service Worker registration failed:', err));
             });
@@ -501,11 +501,53 @@ class OrangeContractApp {
         return `£${parseFloat(amount).toFixed(2)}`;
     }
 
+    buildEasyJetBookingUrl(flight) {
+        const toDDMMYYYY = iso => iso.split('-').reverse().join('-');
+        const params = new URLSearchParams({
+            lang: 'EN',
+            dep: flight.origin,
+            dest: flight.destination,
+            dd: toDDMMYYYY(flight.outbound_date),
+            apax: '1',
+            cpax: '0',
+            ipax: '0',
+            SearchFrom: 'SearchPod2_/en/',
+            dt: 'Desktop',
+            isOneWay: flight.return_date ? 'off' : 'on',
+            pid: 'www.easyjet.com'
+        });
+        if (flight.return_date) params.set('rd', toDDMMYYYY(flight.return_date));
+        return `https://www.easyjet.com/deeplink?${params.toString()}`;
+    }
+
     async setupEventListeners() {
         // Navigation
         document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.switchSection(e.target.dataset.section));
+            btn.addEventListener('click', (e) => this.switchSection(e.currentTarget.dataset.section));
         });
+
+        // Mobile "more sections" hamburger menu
+        const navHamburger = document.getElementById('nav-hamburger');
+        const navSecondary = document.getElementById('nav-secondary');
+        if (navHamburger && navSecondary) {
+            navHamburger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = navSecondary.classList.toggle('open');
+                navHamburger.setAttribute('aria-expanded', String(isOpen));
+            });
+            navSecondary.addEventListener('click', (e) => {
+                if (e.target.closest('.nav-btn')) {
+                    navSecondary.classList.remove('open');
+                    navHamburger.setAttribute('aria-expanded', 'false');
+                }
+            });
+            document.addEventListener('click', (e) => {
+                if (!navSecondary.classList.contains('open')) return;
+                if (navSecondary.contains(e.target) || navHamburger.contains(e.target)) return;
+                navSecondary.classList.remove('open');
+                navHamburger.setAttribute('aria-expanded', 'false');
+            });
+        }
 
         // Dashboard
         document.getElementById('prev-week').addEventListener('click', () => this.changeWeek(-1));
@@ -755,6 +797,7 @@ class OrangeContractApp {
                     <div class="schedule-location" style="color:${locationColor};border-color:${locationColor}">
                         ${location || 'No location'}
                     </div>
+                    ${items.length > 2 ? `<div class="schedule-day-flag" title="${items.length} bookings on this day — scroll to check for duplicates">⚠ ${items.length} bookings — swipe to check for duplicates</div>` : ''}
                     <div class="schedule-day-items">
                         ${items.length ? items.map(item => `
                             <button class="schedule-item ${item.type}" type="button" data-type="${item.type}" data-id="${item.id}">
@@ -1683,10 +1726,16 @@ class OrangeContractApp {
     }
 
     async updatePlannedFlightStatus(id, status) {
-        const { error } = await this.db.from('planned_flights').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+        const update = { status, updated_at: new Date().toISOString() };
+        if (status === 'booked') {
+            const { data: flight } = await this.db.from('planned_flights').select('latest_total_price').eq('id', id).single();
+            update.booked_total_price = flight?.latest_total_price ?? null;
+            update.booked_at = new Date().toISOString();
+        }
+        const { error } = await this.db.from('planned_flights').update(update).eq('id', id);
         if (error) return this.showErrorMessage(error.message);
         await this.loadFareWatchData();
-        this.showSuccessMessage(status === 'booked' ? 'Marked as booked. Daily checks have stopped.' : status === 'paused' ? 'Price watch paused.' : 'Price watch resumed.');
+        this.showSuccessMessage(status === 'booked' ? 'Marked as booked. Fare tracking continues in the Booked section.' : status === 'paused' ? 'Price watch paused.' : 'Price watch resumed.');
     }
 
     async deletePlannedFlight(id) {
@@ -1808,10 +1857,15 @@ class OrangeContractApp {
             container.innerHTML = '<div class="fare-watch-empty">No flights are being watched yet. Plan a trip to start building daily price intelligence.</div>';
             return;
         }
-        const rank = { tracking: 0, paused: 1, booked: 2 };
-        container.innerHTML = [...this.plannedFlights]
-            .sort((a, b) => rank[a.status] - rank[b.status] || a.outbound_date.localeCompare(b.outbound_date))
-            .map(flight => this.renderPlannedFlightCard(flight)).join('');
+        const active = this.plannedFlights.filter(flight => flight.status !== 'booked')
+            .sort((a, b) => a.outbound_date.localeCompare(b.outbound_date));
+        const booked = this.plannedFlights.filter(flight => flight.status === 'booked')
+            .sort((a, b) => a.outbound_date.localeCompare(b.outbound_date));
+        const activeHtml = active.map(flight => this.renderPlannedFlightCard(flight)).join('');
+        const bookedHtml = booked.length
+            ? `<h3 class="fare-watch-booked-heading">Booked</h3>` + booked.map(flight => this.renderBookedFlightCard(flight)).join('')
+            : '';
+        container.innerHTML = activeHtml + bookedHtml;
     }
 
     renderPlannedFlightCard(flight) {
@@ -1825,16 +1879,15 @@ class OrangeContractApp {
         const latestSnapshot = flight.flight_price_snapshots?.at(-1);
         const outTime = latestSnapshot?.outbound_actual_time ? safe(latestSnapshot.outbound_actual_time.slice(0, 5)) : safe(flight.outbound_time?.slice(0, 5));
         const retTime = latestSnapshot?.return_actual_time ? safe(latestSnapshot.return_actual_time.slice(0, 5)) : safe(flight.return_time?.slice(0, 5));
-        const legs = flight.latest_total_price
-            ? (flight.latest_return_price
-                ? `Outbound ${outTime} · ${this.formatCurrency(flight.latest_outbound_price)} · Return ${retTime} · ${this.formatCurrency(flight.latest_return_price)}`
-                : `Outbound ${outTime} · ${this.formatCurrency(flight.latest_outbound_price)}`)
-            : safe(flight.last_error || 'Run the first live price check');
+        const outboundLeg = `Outbound ${outTime} · ${flight.latest_outbound_price ? this.formatCurrency(flight.latest_outbound_price) : '—'}`;
+        const returnLeg = flight.return_date ? ` · Return ${retTime} · ${flight.latest_return_price ? this.formatCurrency(flight.latest_return_price) : '—'}` : '';
+        const legs = flight.latest_total_price ? `${outboundLeg}${returnLeg}` : safe(flight.last_error || 'Run the first live price check');
         const reasons = Array.isArray(flight.recommendation_reasons) ? flight.recommendation_reasons : [];
         const events = Array.isArray(flight.event_insights) ? flight.event_insights : [];
         const sources = Array.isArray(flight.event_sources) ? flight.event_sources : [];
-        const bookingLink = latestSnapshot?.booking_url?.startsWith('https://')
-            ? `<a class="settings-link-button" href="${safe(latestSnapshot.booking_url)}" target="_blank" rel="noopener">View on easyJet</a>` : '';
+        const bookingUrl = this.buildEasyJetBookingUrl(flight);
+        const bookingLink = bookingUrl?.startsWith('https://')
+            ? `<a class="settings-link-button" href="${safe(bookingUrl)}" target="_blank" rel="noopener">Book on easyJet</a>` : '';
         return `<article class="planned-flight-card ${recommendationClass} ${safe(flight.status)}">
             <header class="planned-flight-card-header">
                 <div>
@@ -1848,8 +1901,6 @@ class OrangeContractApp {
                     <span class="current-fare-label">Current total</span>
                     <strong class="current-fare">${fare}</strong>
                     <div class="fare-legs">${legs}</div>
-                    <div class="fare-disclaimer">Prices from Apify easyJet scraper — may differ from live checkout.</div>
-                    <div class="planned-flight-price-row"><span class="fare-trend ${safe(flight.trend)}">${this.fareTrendLabel(flight.trend)}</span>${flight.lowest_total_price ? `<span class="fare-legs">Low ${this.formatCurrency(flight.lowest_total_price)}</span>` : ''}</div>
                     <div class="recommendation-panel">
                         <strong>${safe(flight.recommendation_summary || 'Building your recommendation')}</strong>
                         <ul>${reasons.length ? reasons.map(reason => `<li>${safe(reason)}</li>`).join('') : '<li>Daily observations will reveal whether the fare is rising or falling.</li>'}</ul>
@@ -1873,28 +1924,89 @@ class OrangeContractApp {
         </article>`;
     }
 
+    renderBookedFlightCard(flight) {
+        const safe = value => this.escapeFareWatchHtml(value);
+        const bookedPrice = flight.booked_total_price ? this.formatCurrency(flight.booked_total_price) : '—';
+        const bookedDate = flight.booked_at ? safe(this.formatDateUK(flight.booked_at.slice(0, 10))) : null;
+        const bookedInfo = bookedDate ? `Booked on ${bookedDate} for ${bookedPrice}` : `Booked total ${bookedPrice}`;
+        const fare = flight.latest_total_price ? this.formatCurrency(flight.latest_total_price) : 'Awaiting fare';
+        const latestSnapshot = flight.flight_price_snapshots?.at(-1);
+        const outTime = latestSnapshot?.outbound_actual_time ? safe(latestSnapshot.outbound_actual_time.slice(0, 5)) : safe(flight.outbound_time?.slice(0, 5));
+        const retTime = latestSnapshot?.return_actual_time ? safe(latestSnapshot.return_actual_time.slice(0, 5)) : safe(flight.return_time?.slice(0, 5));
+        const outboundLeg = `Outbound ${outTime} · ${flight.latest_outbound_price ? this.formatCurrency(flight.latest_outbound_price) : '—'}`;
+        const returnLeg = flight.return_date ? ` · Return ${retTime} · ${flight.latest_return_price ? this.formatCurrency(flight.latest_return_price) : '—'}` : '';
+        const legs = flight.latest_total_price ? `${outboundLeg}${returnLeg}` : safe(flight.last_error || 'Run the first live price check');
+        const returnText = flight.return_date ? `<span>Return ${safe(this.formatDateUK(flight.return_date))} at ${safe(flight.return_time?.slice(0, 5))}</span>` : '<span>One way</span>';
+        return `<article class="planned-flight-card booked">
+            <header class="planned-flight-card-header">
+                <div>
+                    <div class="planned-route">${safe(flight.origin)} <span>→</span> ${safe(flight.destination)}</div>
+                    <div class="planned-flight-meta"><span>Out ${safe(this.formatDateUK(flight.outbound_date))} at ${safe(flight.outbound_time?.slice(0, 5))}</span>${returnText}<span>±${safe(flight.time_flex_minutes)} min</span></div>
+                </div>
+                <span class="recommendation-badge booked">Booked</span>
+            </header>
+            <div class="planned-flight-card-body">
+                <div class="fare-summary">
+                    <div class="fare-legs" style="margin-bottom:0.6rem; color:var(--cream-dim);">${bookedInfo}</div>
+                    <span class="current-fare-label">Current total</span>
+                    <strong class="current-fare">${fare}</strong>
+                    <div class="fare-legs">${legs}</div>
+                </div>
+                ${this.renderFarePriceChart(flight.flight_price_snapshots || [], flight.id)}
+            </div>
+            <footer class="planned-flight-card-footer">
+                <span class="last-checked">${flight.last_checked_at ? `Checked ${safe(this.formatRelativeFareWatchTime(flight.last_checked_at))}` : 'Not checked yet'}</span>
+                <div class="planned-flight-actions">
+                    <button data-fare-action="check" data-flight-id="${safe(flight.id)}">Check now</button>
+                    <button class="danger" data-fare-action="delete" data-flight-id="${safe(flight.id)}">Delete</button>
+                </div>
+            </footer>
+        </article>`;
+    }
+
     renderFarePriceChart(snapshots, flightId) {
         if (!snapshots.length) return '<div class="price-chart-wrap"><div class="price-chart-heading"><span>Price history</span></div><div class="price-chart-empty">The first daily observation will appear here.</div></div>';
         const prices = snapshots.map(snapshot => Number(snapshot.total_price));
-        const minimum = Math.min(...prices);
-        const maximum = Math.max(...prices);
-        const spread = Math.max(maximum - minimum, 10);
+        const dataMin = Math.min(...prices);
+        const dataMax = Math.max(...prices);
+        let axisMin = Math.floor(dataMin / 5) * 5;
+        let axisMax = Math.ceil(dataMax / 5) * 5;
+        if (axisMax === axisMin) { axisMin -= 5; axisMax += 5; }
+        const spread = Math.max(axisMax - axisMin, 5);
+        const yFor = price => 112 - ((price - axisMin) / spread) * 94;
         const points = prices.map((price, index) => {
             const x = snapshots.length === 1 ? 50 : 4 + (index / (snapshots.length - 1)) * 92;
-            const y = 112 - ((price - minimum) / spread) * 94;
+            const y = yFor(price);
             return { x, y, price, snapshot: snapshots[index] };
         });
         const path = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
         const areaPath = `${path} L ${points.at(-1).x.toFixed(1)} 124 L ${points[0].x.toFixed(1)} 124 Z`;
         const gradientId = `fare-gradient-${flightId.replaceAll('-', '')}`;
         const labels = `${this.formatDateUK(snapshots[0].observed_on)} → ${this.formatDateUK(snapshots.at(-1).observed_on)}`;
+        const gridLines = [];
+        const scaleLabels = [];
+        const dotOverlays = [];
+        for (let p = axisMin; p <= axisMax; p += 5) {
+            const y = yFor(p);
+            const topPct = ((y / 128) * 100).toFixed(1);
+            gridLines.push(`<line x1="0" y1="${y.toFixed(1)}" x2="92" y2="${y.toFixed(1)}" stroke="var(--border-lt)" stroke-width="0.2" opacity="0.5"></line>`);
+            scaleLabels.push(`<span style="top:${topPct}%">£${p}</span>`);
+        }
+        for (const point of points) {
+            const topPct = ((point.y / 128) * 100).toFixed(1);
+            dotOverlays.push(`<span class="price-chart-dot" style="left:${point.x.toFixed(1)}%; top:${topPct}%;" title="${this.formatCurrency(point.price)} on ${this.formatDateUK(point.snapshot.observed_on)}"></span>`);
+        }
         return `<div class="price-chart-wrap">
             <div class="price-chart-heading"><span>Price history · ${snapshots.length} ${snapshots.length === 1 ? 'day' : 'days'}</span><span>${labels}</span></div>
-            <svg class="price-chart" viewBox="0 0 100 128" preserveAspectRatio="none" role="img" aria-label="Fare price history from ${this.formatCurrency(prices[0])} to ${this.formatCurrency(prices.at(-1))}">
-                <defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5b800"/><stop offset="1" stop-color="#f5b800" stop-opacity="0"/></linearGradient></defs>
-                <path class="price-chart-area" fill="url(#${gradientId})" d="${areaPath}"></path><path class="price-chart-line" d="${path}"></path>
-                ${points.map(point => `<circle class="price-chart-dot" cx="${point.x}" cy="${point.y}" r="1.8"><title>${this.formatCurrency(point.price)} on ${this.formatDateUK(point.snapshot.observed_on)}</title></circle>`).join('')}
-            </svg>
+            <div class="price-chart-body">
+                <svg class="price-chart" viewBox="0 0 100 128" preserveAspectRatio="none" role="img" aria-label="Fare price history from ${this.formatCurrency(prices[0])} to ${this.formatCurrency(prices.at(-1))}">
+                    <defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5b800"/><stop offset="1" stop-color="#f5b800" stop-opacity="0"/></linearGradient></defs>
+                    ${gridLines.join('')}
+                    <path class="price-chart-area" fill="url(#${gradientId})" d="${areaPath}"></path><path class="price-chart-line" d="${path}"></path>
+                </svg>
+                <div class="price-chart-dots">${dotOverlays.join('')}</div>
+                <div class="price-chart-scale">${scaleLabels.join('')}</div>
+            </div>
         </div>`;
     }
 

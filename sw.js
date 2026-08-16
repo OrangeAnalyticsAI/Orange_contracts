@@ -1,4 +1,4 @@
-const CACHE_NAME = 'orange-contract-v19';
+const CACHE_NAME = 'orange-contract-v30';
 const ASSETS = [
   './',
   './index.html',
