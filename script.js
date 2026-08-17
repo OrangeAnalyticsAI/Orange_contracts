@@ -641,11 +641,13 @@ class OrangeContractApp {
         });
 
         // Pre-fill settings fields from secure credential manager
-        const savedUrl = await credentialManager.get('sb-url');
-        const savedKey = await credentialManager.get('sb-key');
-        const savedClientId = await credentialManager.get('google-client-id');
-        const savedGeminiKey = await credentialManager.get('gemini-api-key');
-        const savedFreeAgentToken = await credentialManager.get('freeagent-token');
+        const [savedUrl, savedKey, savedClientId, savedGeminiKey, savedFreeAgentToken] = await Promise.all([
+            credentialManager.get('sb-url'),
+            credentialManager.get('sb-key'),
+            credentialManager.get('google-client-id'),
+            credentialManager.get('gemini-api-key'),
+            credentialManager.get('freeagent-token')
+        ]);
 
         if (savedUrl) document.getElementById('supabase-url').value = savedUrl;
         if (savedKey) document.getElementById('supabase-key').value = savedKey;
@@ -787,6 +789,7 @@ class OrangeContractApp {
             const dayExpenses = this.expenses[dateStr] || this.getDefaultExpenses();
             const location = dayExpenses.location || '';
             const locationColor = this.getLocationColor(location);
+            const safe = value => this.escapeHtml(value);
             days.push(`
                 <article class="schedule-day ${dateStr === today ? 'today' : ''}">
                     <div class="schedule-day-header">
@@ -795,15 +798,15 @@ class OrangeContractApp {
                         <small>${date.toLocaleDateString('en-GB', { month: 'short' })}</small>
                     </div>
                     <div class="schedule-location" style="color:${locationColor};border-color:${locationColor}">
-                        ${location || 'No location'}
+                        ${safe(location) || 'No location'}
                     </div>
                     ${items.length > 2 ? `<div class="schedule-day-flag" title="${items.length} bookings on this day — scroll to check for duplicates">⚠ ${items.length} bookings — swipe to check for duplicates</div>` : ''}
                     <div class="schedule-day-items">
                         ${items.length ? items.map(item => `
-                            <button class="schedule-item ${item.type}" type="button" data-type="${item.type}" data-id="${item.id}">
-                                <span class="schedule-item-type">${item.type}</span>
-                                <strong>${item.time ? `${item.time} · ` : ''}${item.title}</strong>
-                                <small>${item.subtitle}</small>
+                            <button class="schedule-item ${safe(item.type)}" type="button" data-type="${safe(item.type)}" data-id="${safe(item.id)}">
+                                <span class="schedule-item-type">${safe(item.type)}</span>
+                                <strong>${item.time ? `${safe(item.time)} · ` : ''}${safe(item.title)}</strong>
+                                <small>${safe(item.subtitle)}</small>
                             </button>
                         `).join('') : '<span class="schedule-empty">No bookings</span>'}
                     </div>
@@ -864,7 +867,7 @@ class OrangeContractApp {
         typeEl.textContent = type;
         typeEl.className = `schedule-details-type ${type}`;
         titleEl.textContent = title;
-        bodyEl.innerHTML = rows.map(([label, value]) => `<div class="schedule-detail-row"><span>${label}</span><strong>${value}</strong></div>`).join('');
+        bodyEl.innerHTML = rows.map(([label, value]) => `<div class="schedule-detail-row"><span>${this.escapeHtml(label)}</span><strong>${this.escapeHtml(value)}</strong></div>`).join('');
         if (typeof dialog.showModal === 'function') dialog.showModal();
         else dialog.setAttribute('open', '');
     }
@@ -959,7 +962,7 @@ class OrangeContractApp {
             totalDayRate += dayRate;
             totalDailyTotal += dailyTotal;
 
-            const locationOptions = this.locations.map(loc => `<option value="${loc}" ${dayExpenses.location === loc ? 'selected' : ''}>${loc}</option>`).join('');
+            const locationOptions = this.locations.map(loc => `<option value="${this.escapeHtml(loc)}" ${dayExpenses.location === loc ? 'selected' : ''}>${this.escapeHtml(loc)}</option>`).join('');
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td class="day-name" style="color: ${dayColors[dayOfWeek]}">${days[dayOfWeek]}</td>
@@ -970,12 +973,12 @@ class OrangeContractApp {
                         ${locationOptions}
                     </select>
                 </td>
-                <td class="expense-amount">${totalFlightCost > 0 ? this.formatCurrency(totalFlightCost) : '-'}</td>
-                <td class="expense-amount">${totalParkingCost > 0 ? this.formatCurrency(totalParkingCost) : '-'}</td>
-                <td class="expense-amount">${totalAccommodationCost > 0 ? this.formatCurrency(totalAccommodationCost) : '-'}</td>
-                <td class="expense-amount">${totalTransportCost > 0 ? this.formatCurrency(totalTransportCost) : '-'}</td>
-                <td class="expense-amount">${totalFoodCost > 0 ? this.formatCurrency(totalFoodCost) : '-'}</td>
-                <td class="expense-amount">${dayRate > 0 ? this.formatCurrency(dayRate) : '-'}</td>
+                <td class="expense-amount">${totalFlightCost !== 0 ? this.formatCurrency(totalFlightCost) : '-'}</td>
+                <td class="expense-amount">${totalParkingCost !== 0 ? this.formatCurrency(totalParkingCost) : '-'}</td>
+                <td class="expense-amount">${totalAccommodationCost !== 0 ? this.formatCurrency(totalAccommodationCost) : '-'}</td>
+                <td class="expense-amount">${totalTransportCost !== 0 ? this.formatCurrency(totalTransportCost) : '-'}</td>
+                <td class="expense-amount">${totalFoodCost !== 0 ? this.formatCurrency(totalFoodCost) : '-'}</td>
+                <td class="expense-amount">${dayRate !== 0 ? this.formatCurrency(dayRate) : '-'}</td>
                 <td class="daily-total">${this.formatCurrency(dailyTotal)}</td>
             `;
             tbody.appendChild(row);
@@ -989,12 +992,12 @@ class OrangeContractApp {
             <td></td>
             <td></td>
             <td style="text-align: right; padding-right: 1rem;">Totals:</td>
-            <td class="expense-amount">${totalFlight > 0 ? this.formatCurrency(totalFlight) : '-'}</td>
-            <td class="expense-amount">${totalParking > 0 ? this.formatCurrency(totalParking) : '-'}</td>
-            <td class="expense-amount">${totalAccommodation > 0 ? this.formatCurrency(totalAccommodation) : '-'}</td>
-            <td class="expense-amount">${totalTransport > 0 ? this.formatCurrency(totalTransport) : '-'}</td>
-            <td class="expense-amount">${totalFood > 0 ? this.formatCurrency(totalFood) : '-'}</td>
-            <td class="expense-amount">${totalDayRate > 0 ? this.formatCurrency(totalDayRate) : '-'}</td>
+            <td class="expense-amount">${totalFlight !== 0 ? this.formatCurrency(totalFlight) : '-'}</td>
+            <td class="expense-amount">${totalParking !== 0 ? this.formatCurrency(totalParking) : '-'}</td>
+            <td class="expense-amount">${totalAccommodation !== 0 ? this.formatCurrency(totalAccommodation) : '-'}</td>
+            <td class="expense-amount">${totalTransport !== 0 ? this.formatCurrency(totalTransport) : '-'}</td>
+            <td class="expense-amount">${totalFood !== 0 ? this.formatCurrency(totalFood) : '-'}</td>
+            <td class="expense-amount">${totalDayRate !== 0 ? this.formatCurrency(totalDayRate) : '-'}</td>
             <td class="daily-total">${this.formatCurrency(totalDailyTotal)}</td>
         `;
         tbody.appendChild(totalRow);
@@ -1074,7 +1077,7 @@ class OrangeContractApp {
             const totalTransportCost = dayExpenses.transport + transportCostFromBookings;
 
             const row = document.createElement('tr');
-            const locationOptions = this.locations.map(loc => `<option value="${loc}" ${dayExpenses.location === loc ? 'selected' : ''}>${loc}</option>`).join('');
+            const locationOptions = this.locations.map(loc => `<option value="${this.escapeHtml(loc)}" ${dayExpenses.location === loc ? 'selected' : ''}>${this.escapeHtml(loc)}</option>`).join('');
             row.innerHTML = `
                 <td class="day-name" style="color: ${dayColors[i]}">${days[i]}</td>
                 <td>
@@ -1083,11 +1086,11 @@ class OrangeContractApp {
                         ${locationOptions}
                     </select>
                 </td>
-                <td class="expense-amount">${totalFlightCost > 0 ? this.formatCurrency(totalFlightCost) : '-'}</td>
-                <td class="expense-amount">${totalParkingCost > 0 ? this.formatCurrency(totalParkingCost) : '-'}</td>
-                <td class="expense-amount">${totalAccommodationCost > 0 ? this.formatCurrency(totalAccommodationCost) : '-'}</td>
-                <td class="expense-amount">${totalTransportCost > 0 ? this.formatCurrency(totalTransportCost) : '-'}</td>
-                <td class="expense-amount">${dayExpenses.food > 0 ? this.formatCurrency(dayExpenses.food) : '-'}</td>
+                <td class="expense-amount">${totalFlightCost !== 0 ? this.formatCurrency(totalFlightCost) : '-'}</td>
+                <td class="expense-amount">${totalParkingCost !== 0 ? this.formatCurrency(totalParkingCost) : '-'}</td>
+                <td class="expense-amount">${totalAccommodationCost !== 0 ? this.formatCurrency(totalAccommodationCost) : '-'}</td>
+                <td class="expense-amount">${totalTransportCost !== 0 ? this.formatCurrency(totalTransportCost) : '-'}</td>
+                <td class="expense-amount">${dayExpenses.food !== 0 ? this.formatCurrency(dayExpenses.food) : '-'}</td>
                 <td class="daily-total">${this.formatCurrency(this.calculateDailyTotal(dayExpenses) + flightCostFromBookings + parkingCostFromBookings + accommodationCostFromBookings + transportCostFromBookings)}</td>
                 <td>
                     <button class="edit-btn" onclick="app.editDay('${dateStr}')">Edit</button>
@@ -1105,11 +1108,11 @@ class OrangeContractApp {
         totalRow.innerHTML = `
             <td></td>
             <td style="text-align: right; padding-right: 1rem;">Totals:</td>
-            <td class="expense-amount">${columnTotals.flight > 0 ? this.formatCurrency(columnTotals.flight) : '-'}</td>
-            <td class="expense-amount">${columnTotals.parking > 0 ? this.formatCurrency(columnTotals.parking) : '-'}</td>
-            <td class="expense-amount">${columnTotals.accommodation > 0 ? this.formatCurrency(columnTotals.accommodation) : '-'}</td>
-            <td class="expense-amount">${columnTotals.transport > 0 ? this.formatCurrency(columnTotals.transport) : '-'}</td>
-            <td class="expense-amount">${columnTotals.food > 0 ? this.formatCurrency(columnTotals.food) : '-'}</td>
+            <td class="expense-amount">${columnTotals.flight !== 0 ? this.formatCurrency(columnTotals.flight) : '-'}</td>
+            <td class="expense-amount">${columnTotals.parking !== 0 ? this.formatCurrency(columnTotals.parking) : '-'}</td>
+            <td class="expense-amount">${columnTotals.accommodation !== 0 ? this.formatCurrency(columnTotals.accommodation) : '-'}</td>
+            <td class="expense-amount">${columnTotals.transport !== 0 ? this.formatCurrency(columnTotals.transport) : '-'}</td>
+            <td class="expense-amount">${columnTotals.food !== 0 ? this.formatCurrency(columnTotals.food) : '-'}</td>
             <td class="daily-total">${this.formatCurrency(columnTotals.grandTotal)}</td>
             <td></td>
         `;
@@ -1341,7 +1344,7 @@ class OrangeContractApp {
         let flightToSave = dayExpenses.flight;
         if (flightCostFromBookings > 0) {
             // Flight input shows total (manual + bookings), so subtract bookings to get manual
-            flightToSave = Math.max(0, totalFlightValue - flightCostFromBookings);
+            flightToSave = totalFlightValue - flightCostFromBookings;
         } else {
             // No bookings, save the value as-is
             flightToSave = totalFlightValue;
@@ -1351,7 +1354,7 @@ class OrangeContractApp {
         let parkingToSave = dayExpenses.parking;
         if (parkingCostFromBookings > 0) {
             // Parking input shows total (manual + bookings), so subtract bookings to get manual
-            parkingToSave = Math.max(0, totalParkingValue - parkingCostFromBookings);
+            parkingToSave = totalParkingValue - parkingCostFromBookings;
         } else {
             // No bookings, save the value as-is
             parkingToSave = totalParkingValue;
@@ -1361,7 +1364,7 @@ class OrangeContractApp {
         let accommodationToSave = dayExpenses.accommodation;
         if (accommodationCostFromBookings > 0) {
             // Accommodation input shows total (manual + bookings), so subtract bookings to get manual
-            accommodationToSave = Math.max(0, totalAccommodationValue - accommodationCostFromBookings);
+            accommodationToSave = totalAccommodationValue - accommodationCostFromBookings;
         } else {
             // No bookings, save the value as-is
             accommodationToSave = totalAccommodationValue;
@@ -1371,7 +1374,7 @@ class OrangeContractApp {
         let transportToSave = dayExpenses.transport;
         if (transportCostFromBookings > 0) {
             // Transport input shows total (manual + bookings), so subtract bookings to get manual
-            transportToSave = Math.max(0, totalTransportValue - transportCostFromBookings);
+            transportToSave = totalTransportValue - transportCostFromBookings;
         } else {
             // No bookings, save the value as-is
             transportToSave = totalTransportValue;
@@ -1588,23 +1591,24 @@ class OrangeContractApp {
         const renderItem = (b) => {
             const isToday = b.date === today;
             const isPast = b.date < today;
+            const safe = value => this.escapeHtml(value);
             return `
             <div class="booking-item ${isPast ? 'past' : ''} ${isToday ? 'today' : ''}">
                 <div class="booking-main">
-                    <span class="booking-flight">${b.flightNumber}</span>
-                    <span class="booking-route">${b.route}</span>
-                    <span class="booking-date">${this.formatDateUK(b.date)}</span>
+                    <span class="booking-flight">${safe(b.flightNumber)}</span>
+                    <span class="booking-route">${safe(b.route)}</span>
+                    <span class="booking-date">${safe(this.formatDateUK(b.date))}</span>
                 </div>
                 <div class="booking-details">
-                    ${b.departureTime ? `<span>✈ ${b.departureTime}${b.arrivalTime ? ' → ' + b.arrivalTime : ''}</span>` : ''}
-                    ${b.bookingRef ? `<span>Ref: <strong>${b.bookingRef}</strong></span>` : ''}
-                    ${b.seat ? `<span>Seat: <strong>${b.seat}</strong></span>` : ''}
-                    ${b.notes ? `<span>${b.notes}</span>` : ''}
+                    ${b.departureTime ? `<span>✈ ${safe(b.departureTime)}${b.arrivalTime ? ' → ' + safe(b.arrivalTime) : ''}</span>` : ''}
+                    ${b.bookingRef ? `<span>Ref: <strong>${safe(b.bookingRef)}</strong></span>` : ''}
+                    ${b.seat ? `<span>Seat: <strong>${safe(b.seat)}</strong></span>` : ''}
+                    ${b.notes ? `<span>${safe(b.notes)}</span>` : ''}
                     <span class="booking-price">${this.formatCurrency(b.pricePaid)}</span>
                 </div>
                 <div class="booking-actions">
-                    <button onclick="app.showBookingForm(app.bookings.find(b=>b.id==='${b.id}'))">Edit</button>
-                    <button class="delete-btn" onclick="app.deleteBooking('${b.id}')">Delete</button>
+                    <button onclick="app.showBookingForm(app.bookings.find(b=>b.id==='${safe(b.id)}'))">Edit</button>
+                    <button class="delete-btn" onclick="app.deleteBooking('${safe(b.id)}')">Delete</button>
                 </div>
             </div>`;
         };
@@ -1622,10 +1626,14 @@ class OrangeContractApp {
         container.innerHTML = html;
     }
 
-    escapeFareWatchHtml(value) {
+    escapeHtml(value) {
         return String(value ?? '').replace(/[&<>'"]/g, character => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
         })[character]);
+    }
+
+    escapeFareWatchHtml(value) {
+        return this.escapeHtml(value);
     }
 
     showPlannedFlightForm(flight = null) {
@@ -1850,7 +1858,7 @@ class OrangeContractApp {
             return prices.length && flight.latest_total_price ? Math.max(...prices) - Number(flight.latest_total_price) : 0;
         });
         const bestSaving = Math.max(0, ...savings);
-        document.getElementById('fare-stat-saving').textContent = bestSaving > 0 ? this.formatCurrency(bestSaving) : '—';
+        document.getElementById('fare-stat-saving').textContent = bestSaving !== 0 ? this.formatCurrency(bestSaving) : '—';
         const checks = tracked.map(flight => flight.last_checked_at).filter(Boolean).sort().reverse();
         document.getElementById('fare-stat-last-scan').textContent = checks.length ? this.formatRelativeFareWatchTime(checks[0]) : 'Not yet';
         if (!this.plannedFlights.length) {
@@ -2235,21 +2243,22 @@ class OrangeContractApp {
             );
 
             const item = document.createElement('div');
+            const safe = value => this.escapeHtml(value);
             item.className = `freeagent-expense-item ${isLinked ? 'linked' : ''}`;
             item.innerHTML = `
                 <input type="checkbox" 
                        class="freeagent-checkbox" 
-                       data-expense-id="${expenseId}"
-                       data-date="${date}"
-                       data-description="${description}"
-                       data-category="${category}"
+                       data-expense-id="${safe(expenseId)}"
+                       data-date="${safe(date)}"
+                       data-description="${safe(description)}"
+                       data-category="${safe(category)}"
                        data-amount="${amount}"
                        ${isLinked ? 'checked' : ''}
                        onchange="app.toggleFreeAgentExpense(this)">
                 <div class="freeagent-expense-details">
-                    <span class="freeagent-expense-date">${this.formatDateDisplay(date)}</span>
-                    <span class="freeagent-expense-category">${category}</span>
-                    <span class="freeagent-expense-description">${description}</span>
+                    <span class="freeagent-expense-date">${safe(this.formatDateDisplay(date))}</span>
+                    <span class="freeagent-expense-category">${safe(category)}</span>
+                    <span class="freeagent-expense-description">${safe(description)}</span>
                     <span class="freeagent-expense-amount">£${amount.toFixed(2)}</span>
                 </div>
             `;
@@ -2427,11 +2436,13 @@ class OrangeContractApp {
             this.showSuccessMessage(`Restored ${count} credentials!`);
             
             // Refresh the form fields
-            const savedUrl = await credentialManager.get('sb-url');
-            const savedKey = await credentialManager.get('sb-key');
-            const savedClientId = await credentialManager.get('google-client-id');
-            const savedGeminiKey = await credentialManager.get('gemini-api-key');
-            const savedFreeAgentToken = await credentialManager.get('freeagent-token');
+            const [savedUrl, savedKey, savedClientId, savedGeminiKey, savedFreeAgentToken] = await Promise.all([
+                credentialManager.get('sb-url'),
+                credentialManager.get('sb-key'),
+                credentialManager.get('google-client-id'),
+                credentialManager.get('gemini-api-key'),
+                credentialManager.get('freeagent-token')
+            ]);
 
             if (savedUrl) document.getElementById('supabase-url').value = savedUrl;
             if (savedKey) document.getElementById('supabase-key').value = savedKey;
@@ -3139,17 +3150,18 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
                 const disabledAttr = alreadyHandled ? 'disabled' : '';
                 const importBtnText = isSkipped ? '🚫 Always Skipped' : (isDuplicate ? '✓ Already Imported' : '➕ Import');
                 const importBtnStyle = isSkipped ? 'background: #ef4444; color: white; cursor: not-allowed;' : (isDuplicate ? 'background: #4CAF50; color: white; cursor: not-allowed;' : '');
+                const safe = value => this.escapeHtml(value);
 
                 return `
                 <div class="gmail-result-item" id="gmail-parking-item-${i}" style="${greyedStyle}">
                     <div class="gmail-result-header">
-                        <strong>${d.carParkName || '—'}</strong>
-                        <span>Arrive: ${this.formatDateUK(d.arrivalDate)} ${d.arrivalTime || ''}</span>
-                        <span>Return: ${this.formatDateUK(d.returnDate)} ${d.returnTime || ''}</span>
-                        ${d.pricePaid ? `<span class="gmail-price">£${d.pricePaid}</span>` : ''}
-                        ${d.bookingRef ? `<span class="gmail-ref">Ref: ${d.bookingRef}</span>` : ''}
-                        ${d.carRegistration ? `<span>Reg: ${d.carRegistration}</span>` : ''}
-                        ${d.bookingStatus ? `<span class="gmail-status ${(d.bookingStatus || '').toLowerCase()}">${d.bookingStatus}</span>` : ''}
+                        <strong>${safe(d.carParkName) || '—'}</strong>
+                        <span>Arrive: ${safe(this.formatDateUK(d.arrivalDate))} ${safe(d.arrivalTime || '')}</span>
+                        <span>Return: ${safe(this.formatDateUK(d.returnDate))} ${safe(d.returnTime || '')}</span>
+                        ${d.pricePaid ? `<span class="gmail-price">£${safe(d.pricePaid)}</span>` : ''}
+                        ${d.bookingRef ? `<span class="gmail-ref">Ref: ${safe(d.bookingRef)}</span>` : ''}
+                        ${d.carRegistration ? `<span>Reg: ${safe(d.carRegistration)}</span>` : ''}
+                        ${d.bookingStatus ? `<span class="gmail-status ${safe((d.bookingStatus || '').toLowerCase())}">${safe(d.bookingStatus)}</span>` : ''}
                     </div>
                     <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
                         <button onclick="app.importGmailParkingBooking(${i})" class="gmail-import-btn" style="padding: 0.35rem 0.75rem; ${importBtnStyle}" ${disabledAttr}>${importBtnText}</button>
@@ -3340,21 +3352,22 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
         }
 
         const renderItem = (p, isPrevious) => {
+            const safe = value => this.escapeHtml(value);
             return `
             <div class="booking-item ${isPrevious ? 'past' : ''}">
                 <div class="booking-details">
-                    <strong>${p.carParkName}</strong>
-                    <span>Arrive: ${this.formatDateUK(p.arrivalDate)} ${p.arrivalTime || ''}</span>
-                    <span>Return: ${this.formatDateUK(p.returnDate)} ${p.returnTime || ''}</span>
-                    ${p.bookingRef ? `<span>Ref: <strong>${p.bookingRef}</strong></span>` : ''}
-                    ${p.carRegistration ? `<span>Reg: <strong>${p.carRegistration}</strong></span>` : ''}
-                    ${p.bookingStatus ? `<span class="booking-status ${(p.bookingStatus || '').toLowerCase()}">${p.bookingStatus}</span>` : ''}
-                    ${p.notes ? `<span>${p.notes}</span>` : ''}
+                    <strong>${safe(p.carParkName)}</strong>
+                    <span>Arrive: ${safe(this.formatDateUK(p.arrivalDate))} ${safe(p.arrivalTime || '')}</span>
+                    <span>Return: ${safe(this.formatDateUK(p.returnDate))} ${safe(p.returnTime || '')}</span>
+                    ${p.bookingRef ? `<span>Ref: <strong>${safe(p.bookingRef)}</strong></span>` : ''}
+                    ${p.carRegistration ? `<span>Reg: <strong>${safe(p.carRegistration)}</strong></span>` : ''}
+                    ${p.bookingStatus ? `<span class="booking-status ${safe((p.bookingStatus || '').toLowerCase())}">${safe(p.bookingStatus)}</span>` : ''}
+                    ${p.notes ? `<span>${safe(p.notes)}</span>` : ''}
                     <span class="booking-price">${this.formatCurrency(p.pricePaid)}</span>
                 </div>
                 <div class="booking-actions">
-                    <button onclick="app.showParkingBookingForm(app.parkingBookings.find(p=>p.id==='${p.id}'))">Edit</button>
-                    <button class="delete-btn" onclick="app.deleteParking('${p.id}')">Delete</button>
+                    <button onclick="app.showParkingBookingForm(app.parkingBookings.find(p=>p.id==='${safe(p.id)}'))">Edit</button>
+                    <button class="delete-btn" onclick="app.deleteParking('${safe(p.id)}')">Delete</button>
                 </div>
             </div>`;
         };
@@ -3496,19 +3509,20 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
         listDiv.innerHTML = sortedAccommodation.map(a => {
             const nights = this.calculateNights(a.fromDate, a.toDate);
             const totalCost = nights * a.pricePerNight;
+            const safe = value => this.escapeHtml(value);
             return `
             <div class="booking-item">
                 <div class="booking-details">
-                    <strong>${a.name}</strong>
-                    <span>${this.formatDateUK(a.fromDate)} → ${this.formatDateUK(a.toDate)} (${nights} night${nights !== 1 ? 's' : ''})</span>
+                    <strong>${safe(a.name)}</strong>
+                    <span>${safe(this.formatDateUK(a.fromDate))} → ${safe(this.formatDateUK(a.toDate))} (${nights} night${nights !== 1 ? 's' : ''})</span>
                     <span>Price: ${this.formatCurrency(a.pricePerNight)}/night</span>
                     <span class="booking-price">Total: ${this.formatCurrency(totalCost)}</span>
                     ${a.breakfastIncluded ? '<span>🍳 Breakfast included</span>' : ''}
-                    ${a.notes ? `<span>${a.notes}</span>` : ''}
+                    ${a.notes ? `<span>${safe(a.notes)}</span>` : ''}
                 </div>
                 <div class="booking-actions">
-                    <button onclick="app.showAccommodationForm(app.accommodationBookings.find(a=>a.id==='${a.id}'))">Edit</button>
-                    <button class="delete-btn" onclick="app.deleteAccommodation('${a.id}')">Delete</button>
+                    <button onclick="app.showAccommodationForm(app.accommodationBookings.find(a=>a.id==='${safe(a.id)}'))">Edit</button>
+                    <button class="delete-btn" onclick="app.deleteAccommodation('${safe(a.id)}')">Delete</button>
                 </div>
             </div>
         `}).join('');
@@ -3642,18 +3656,19 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
         listDiv.innerHTML = sortedTransport.map(t => {
             const days = this.calculateTransportDays(t.fromDate, t.toDate);
             const perDay = days > 0 ? t.totalCost / days : 0;
+            const safe = value => this.escapeHtml(value);
             return `
             <div class="booking-item">
                 <div class="booking-details">
-                    <strong>${t.name}</strong>
-                    <span>${this.formatDateUK(t.fromDate)} → ${this.formatDateUK(t.toDate)} (${days} day${days !== 1 ? 's' : ''})</span>
+                    <strong>${safe(t.name)}</strong>
+                    <span>${safe(this.formatDateUK(t.fromDate))} → ${safe(this.formatDateUK(t.toDate))} (${days} day${days !== 1 ? 's' : ''})</span>
                     <span>Total: ${this.formatCurrency(t.totalCost)}</span>
                     <span class="booking-price">${this.formatCurrency(perDay)}/day</span>
-                    ${t.notes ? `<span>${t.notes}</span>` : ''}
+                    ${t.notes ? `<span>${safe(t.notes)}</span>` : ''}
                 </div>
                 <div class="booking-actions">
-                    <button onclick="app.showTransportForm(app.transportBookings.find(t=>t.id==='${t.id}'))">Edit</button>
-                    <button class="delete-btn" onclick="app.deleteTransport('${t.id}')">Delete</button>
+                    <button onclick="app.showTransportForm(app.transportBookings.find(t=>t.id==='${safe(t.id)}'))">Edit</button>
+                    <button class="delete-btn" onclick="app.deleteTransport('${safe(t.id)}')">Delete</button>
                 </div>
             </div>
         `}).join('');
@@ -3734,15 +3749,16 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
             ${found.map((item, i) => {
                 const d = item.details;
                 const route = this.cleanRoute(d.route);
+                const safe = value => this.escapeHtml(value);
                 return `
                 <div class="gmail-result-item" id="gmail-item-${i}">
                     <div class="gmail-result-header">
-                        <strong>${d.flightNumber || '—'}</strong>
-                        <span>${route}</span>
-                        <span>${this.formatDateUK(d.date)}</span>
-                        ${d.seat ? `<span>Seat: ${d.seat}</span>` : ''}
-                        ${d.pricePaid ? `<span class="gmail-price">£${d.pricePaid}</span>` : ''}
-                        ${d.bookingRef ? `<span class="gmail-ref">Ref: ${d.bookingRef}</span>` : ''}
+                        <strong>${safe(d.flightNumber) || '—'}</strong>
+                        <span>${safe(route)}</span>
+                        <span>${safe(this.formatDateUK(d.date))}</span>
+                        ${d.seat ? `<span>Seat: ${safe(d.seat)}</span>` : ''}
+                        ${d.pricePaid ? `<span class="gmail-price">£${safe(d.pricePaid)}</span>` : ''}
+                        ${d.bookingRef ? `<span class="gmail-ref">Ref: ${safe(d.bookingRef)}</span>` : ''}
                     </div>
                     <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
                         <button onclick="app.importGmailBooking(${i})" class="gmail-import-btn" style="padding: 0.35rem 0.75rem;">➕ Import</button>
@@ -3906,15 +3922,17 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
         
         if (this.useSupabase) {
             const { data: skipped } = await this.db.from('skipped_bookings')
-                .select('*')
+                .select('id')
                 .eq('booking_ref', normalizedRef)
-                .eq('date', bookingDate);
+                .eq('date', bookingDate)
+                .limit(1);
             if (skipped && skipped.length > 0) return true;
             
             const { data: existing } = await this.db.from('bookings')
-                .select('*')
+                .select('id')
                 .eq('booking_ref', normalizedRef)
-                .eq('booking_date', bookingDate);
+                .eq('booking_date', bookingDate)
+                .limit(1);
             if (existing && existing.length > 0) return true;
         } else {
             const isSkipped = this.skippedBookings.some(
@@ -3946,7 +3964,7 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
             const isDuplicate = await this.isBookingSkippedOrDuplicate(bookingRef, bookingDate);
             if (isDuplicate) {
                 const parsedDiv = document.getElementById('parsed-flight');
-                parsedDiv.innerHTML = `<div class="parse-warning">⚠️ This booking (Ref: ${bookingRef}, Booking Date: ${bookingDate}) already exists or was skipped. No need to import again.</div>`;
+                parsedDiv.innerHTML = `<div class="parse-warning">⚠️ This booking (Ref: ${this.escapeHtml(bookingRef)}, Booking Date: ${this.escapeHtml(bookingDate)}) already exists or was skipped. No need to import again.</div>`;
                 return;
             }
         }
@@ -4040,7 +4058,7 @@ ${emailText}`;
             this.showSuccessMessage('Parsed successfully with Gemini AI!');
         } catch (e) {
             console.error('Gemini extraction failed:', e);
-            parsedDiv.innerHTML = `<div class="parse-warning">⚠️ Gemini AI extraction failed: ${e.message}. Please check your API key and network connection.</div>`;
+            parsedDiv.innerHTML = `<div class="parse-warning">⚠️ Gemini AI extraction failed: ${this.escapeHtml(e.message)}. Please check your API key and network connection.</div>`;
         }
     }
 
@@ -4056,21 +4074,22 @@ ${emailText}`;
                 <h4>🧠 Gemini AI Extracted Bookings (${bookings.length})</h4>
                 <p class="gmail-hint">Review each item and click Import to add it.</p>
                 ${bookings.map((booking, i) => {
+                    const safe = value => this.escapeHtml(value);
                     return `
                     <div style="border-bottom: 1px solid #e0e0e0; margin-bottom: 1rem; padding-bottom: 1rem;">
-                        <h5 style="color: #ff6b35; margin-bottom: 0.5rem;">Item ${i + 1}: ${booking.route}</h5>
+                        <h5 style="color: #ff6b35; margin-bottom: 0.5rem;">Item ${i + 1}: ${safe(booking.route)}</h5>
                         <table class="parsed-table">
-                            <tr><td>Reference / Flight</td><td><strong>${booking.flightNumber || '—'}</strong></td></tr>
-                            <tr><td>Date</td><td><strong>${this.formatDateUK(booking.date)}</strong></td></tr>
-                            <tr><td>Route / Details</td><td>${booking.route || '—'}</td></tr>
-                            <tr><td>Start / Departs</td><td>${booking.departureTime || '—'}</td></tr>
-                            <tr><td>End / Arrives</td><td>${booking.arrivalTime || '—'}</td></tr>
-                            <tr><td>Booking Ref</td><td>${booking.bookingRef || '—'}</td></tr>
-                            <tr><td>Seat</td><td>${booking.seat || '—'}</td></tr>
-                            <tr><td>Price</td><td>${booking.pricePaid ? '£' + booking.pricePaid : '— (Or included)'}</td></tr>
-                            ${booking.notes ? `<tr><td>Notes</td><td><small>${booking.notes}</small></td></tr>` : ''}
+                            <tr><td>Reference / Flight</td><td><strong>${safe(booking.flightNumber) || '—'}</strong></td></tr>
+                            <tr><td>Date</td><td><strong>${safe(this.formatDateUK(booking.date))}</strong></td></tr>
+                            <tr><td>Route / Details</td><td>${safe(booking.route) || '—'}</td></tr>
+                            <tr><td>Start / Departs</td><td>${safe(booking.departureTime) || '—'}</td></tr>
+                            <tr><td>End / Arrives</td><td>${safe(booking.arrivalTime) || '—'}</td></tr>
+                            <tr><td>Booking Ref</td><td>${safe(booking.bookingRef) || '—'}</td></tr>
+                            <tr><td>Seat</td><td>${safe(booking.seat) || '—'}</td></tr>
+                            <tr><td>Price</td><td>${booking.pricePaid ? '£' + safe(booking.pricePaid) : '— (Or included)'}</td></tr>
+                            ${booking.notes ? `<tr><td>Notes</td><td><small>${safe(booking.notes)}</small></td></tr>` : ''}
                         </table>
-                        <button onclick="app.importSegment(${i})" style="margin-top: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.85rem;">➕ Add ${booking.flightNumber || 'Item'} to Bookings</button>
+                        <button onclick="app.importSegment(${i})" style="margin-top: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.85rem;">➕ Add ${safe(booking.flightNumber) || 'Item'} to Bookings</button>
                     </div>`;
                 }).join('')}
             </div>`;
@@ -4208,18 +4227,19 @@ ${emailText}`;
                 <h4>Extracted Flights (${flights.length})</h4>
                 ${flights.map((flight, i) => {
                     const route = flight.departure && flight.arrival ? `${flight.departure} → ${flight.arrival}` : 'Not found';
+                    const safe = value => this.escapeHtml(value);
                     return `
                     <div style="border-bottom: 1px solid #e0e0e0; margin-bottom: 1rem; padding-bottom: 1rem;">
-                        <h5 style="color: #ff6b35; margin-bottom: 0.5rem;">Flight ${i + 1}: ${flight.flightNumber}</h5>
+                        <h5 style="color: #ff6b35; margin-bottom: 0.5rem;">Flight ${i + 1}: ${safe(flight.flightNumber)}</h5>
                         <table class="parsed-table">
-                            <tr><td>Flight</td><td><strong>${flight.flightNumber || '—'}</strong></td></tr>
-                            <tr><td>Date</td><td>${flight.date || '—'}</td></tr>
-                            <tr><td>Route</td><td>${route}</td></tr>
-                            <tr><td>Departure</td><td>${flight.departureTime || '—'}</td></tr>
-                            <tr><td>Arrival</td><td>${flight.arrivalTime || '—'}</td></tr>
-                            <tr><td>Booking Ref</td><td>${flight.bookingRef || '—'}</td></tr>
-                            <tr><td>Seat</td><td><strong>${flight.seat || 'Not assigned'}</strong></td></tr>
-                            <tr><td>Price (Outbound)</td><td>${flight.cost ? '£' + flight.cost : '— (Included)'}</td></tr>
+                            <tr><td>Flight</td><td><strong>${safe(flight.flightNumber) || '—'}</strong></td></tr>
+                            <tr><td>Date</td><td>${safe(flight.date) || '—'}</td></tr>
+                            <tr><td>Route</td><td>${safe(route)}</td></tr>
+                            <tr><td>Departure</td><td>${safe(flight.departureTime) || '—'}</td></tr>
+                            <tr><td>Arrival</td><td>${safe(flight.arrivalTime) || '—'}</td></tr>
+                            <tr><td>Booking Ref</td><td>${safe(flight.bookingRef) || '—'}</td></tr>
+                            <tr><td>Seat</td><td><strong>${safe(flight.seat) || 'Not assigned'}</strong></td></tr>
+                            <tr><td>Price (Outbound)</td><td>${flight.cost ? '£' + safe(flight.cost) : '— (Included)'}</td></tr>
                         </table>
                         <button onclick="app.importSegment(${i})" style="margin-top: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.85rem;">➕ Add Flight ${i + 1} to Bookings</button>
                     </div>`;
@@ -4553,17 +4573,18 @@ ${emailText}`;
             return;
         }
         const route = flight.departure && flight.arrival ? `${flight.departure} → ${flight.arrival}` : 'Not found';
+        const safe = value => this.escapeHtml(value);
         parsedDiv.innerHTML = `
             <div class="parsed-result">
                 <h4>Extracted Details</h4>
                 <table class="parsed-table">
-                    <tr><td>Flight</td><td><strong>${flight.flightNumber || '—'}</strong></td></tr>
-                    <tr><td>Date</td><td>${flight.date || '—'}</td></tr>
-                    <tr><td>Route</td><td>${route}</td></tr>
-                    <tr><td>Departure</td><td>${flight.departureTime || '—'}</td></tr>
-                    <tr><td>Arrival</td><td>${flight.arrivalTime || '—'}</td></tr>
-                    <tr><td>Booking Ref</td><td>${flight.bookingRef || '—'}</td></tr>
-                    <tr><td>Price</td><td>${flight.cost ? '£' + flight.cost : '—'}</td></tr>
+                    <tr><td>Flight</td><td><strong>${safe(flight.flightNumber) || '—'}</strong></td></tr>
+                    <tr><td>Date</td><td>${safe(flight.date) || '—'}</td></tr>
+                    <tr><td>Route</td><td>${safe(route)}</td></tr>
+                    <tr><td>Departure</td><td>${safe(flight.departureTime) || '—'}</td></tr>
+                    <tr><td>Arrival</td><td>${safe(flight.arrivalTime) || '—'}</td></tr>
+                    <tr><td>Booking Ref</td><td>${safe(flight.bookingRef) || '—'}</td></tr>
+                    <tr><td>Price</td><td>${flight.cost ? '£' + safe(flight.cost) : '—'}</td></tr>
                 </table>
                 <button id="add-parsed-booking">➕ Add to Bookings</button>
             </div>`;

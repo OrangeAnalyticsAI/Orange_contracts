@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Orange Contract - Weekly Travel Expense Tracker</title>
+    <meta name="referrer" content="strict-origin-when-cross-origin">
     <link rel="stylesheet" href="styles.css?v=30">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff6b35">
@@ -120,26 +123,26 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label for="flight">Flight (£):</label>
-                            <input type="number" id="flight" step="0.01" min="0" placeholder="0.00">
+                            <input type="number" id="flight" step="0.01" placeholder="0.00">
                         </div>
                         <div class="form-group">
                             <label for="parking">Silver Zone Parking (£):</label>
-                            <input type="number" id="parking" step="0.01" min="0" placeholder="0.00">
+                            <input type="number" id="parking" step="0.01" placeholder="0.00">
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="accommodation">Accommodation (£):</label>
-                            <input type="number" id="accommodation" step="0.01" min="0" placeholder="0.00">
+                            <input type="number" id="accommodation" step="0.01" placeholder="0.00">
                         </div>
                         <div class="form-group">
                             <label for="transport">Transport (Bus/Taxi) (£):</label>
-                            <input type="number" id="transport" step="0.01" min="0" placeholder="0.00">
+                            <input type="number" id="transport" step="0.01" placeholder="0.00">
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="food">Food (£):</label>
-                        <input type="number" id="food" step="0.01" min="0" placeholder="0.00">
+                        <input type="number" id="food" step="0.01" placeholder="0.00">
                     </div>
                     <div class="form-actions">
                         <button type="submit">Save Expenses</button>
@@ -381,7 +384,7 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="booking-price">Price Paid (£):</label>
-                                <input type="number" id="booking-price" step="0.01" min="0" placeholder="0.00" required>
+                                <input type="number" id="booking-price" step="0.01" placeholder="0.00" required>
                             </div>
                             <div class="form-group">
                                 <label for="booking-ref">Booking Reference:</label>
@@ -464,7 +467,7 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="parking-price">Price Paid (£):</label>
-                                <input type="number" id="parking-price" step="0.01" min="0" placeholder="0.00" required>
+                                <input type="number" id="parking-price" step="0.01" placeholder="0.00" required>
                             </div>
                             <div class="form-group">
                                 <label for="parking-car-reg">Car Registration:</label>
@@ -532,7 +535,7 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="accommodation-price-per-night">Price Per Night (£):</label>
-                                <input type="number" id="accommodation-price-per-night" step="0.01" min="0" placeholder="0.00" required>
+                                <input type="number" id="accommodation-price-per-night" step="0.01" placeholder="0.00" required>
                             </div>
                             <div class="form-group">
                                 <label for="accommodation-booking-date">Booking Date:</label>
@@ -592,7 +595,7 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="transport-total-cost">Total Cost (£):</label>
-                                <input type="number" id="transport-total-cost" step="0.01" min="0" placeholder="0.00" required>
+                                <input type="number" id="transport-total-cost" step="0.01" placeholder="0.00" required>
                             </div>
                             <div class="form-group">
                                 <label for="transport-booking-date">Booking Date:</label>
@@ -732,7 +735,7 @@
                 <details class="setup-steps">
                     <summary>How to get a Free Gemini API Key</summary>
                     <ol>
-                        <li>Go to <a href="https://aistudio.google.com/" target="_blank">aistudio.google.com</a></li>
+                        <li>Go to <a href="https://aistudio.google.com/" target="_blank" rel="noopener">aistudio.google.com</a></li>
                         <li>Click <strong>Get API Key</strong> and sign in with any Google Account</li>
                         <li>Click <strong>Create API Key</strong></li>
                         <li>Copy the generated key and paste it below</li>
@@ -795,7 +798,7 @@
                 <details class="setup-steps">
                     <summary>How to get a Google Client ID</summary>
                     <ol>
-                        <li>Go to <a href="https://console.cloud.google.com/" target="_blank">console.cloud.google.com</a></li>
+                        <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">console.cloud.google.com</a></li>
                         <li>Create a new project (e.g. <em>OrangeContract</em>)</li>
                         <li>Go to <strong>APIs &amp; Services → Enable APIs</strong> and enable the <strong>Gmail API</strong></li>
                         <li>Go to <strong>APIs &amp; Services → Credentials → Create Credentials → OAuth client ID</strong></li>
@@ -842,7 +845,7 @@
             <!-- Credential Backup/Restore -->
             <section class="settings-panel">
                 <h3>🔐 Credential Backup & Restore</h3>
-                <p class="settings-help">Securely backup your API keys and credentials to a file, or restore from a previous backup. This is useful when switching browsers or devices. The backup file is encrypted.</p>
+                <p class="settings-help">Securely backup your API keys and credentials to a file, or restore from a previous backup. This is useful when switching browsers or devices. The backup file contains your keys in readable form — store it somewhere private and never email or share it.</p>
                 <div class="settings-controls">
                     <div class="form-actions">
                         <button id="export-credentials" type="button">📥 Export Credentials</button>

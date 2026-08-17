@@ -15,3 +15,6 @@ credential-backups/
 # Temporary files
 tmp/
 temp/
+
+# Supabase CLI local state
+supabase/.temp/
