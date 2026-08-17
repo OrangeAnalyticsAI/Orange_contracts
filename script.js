@@ -941,12 +941,7 @@ class OrangeContractApp {
             const totalFoodCost = dayExpenses.food;
 
             // Day Rate: Glasgow £850, Home/others £790, Leave £0
-            let dayRate = 0;
-            if (dayExpenses.location === 'Glasgow') {
-                dayRate = 850;
-            } else if (dayExpenses.location && dayExpenses.location !== 'Leave') {
-                dayRate = 790;
-            }
+            const dayRate = this.getDayRate(dayExpenses.location);
 
             if (dayRate > 0) {
                 daysWorked++;
@@ -1234,12 +1229,35 @@ class OrangeContractApp {
         return total;
     }
 
+    getDayRate(location) {
+        if (location === 'Glasgow') return 850;
+        if (location && location !== 'Leave') return 790;
+        return 0;
+    }
+
+    calculateWeeklyDayRateInfo() {
+        let totalDayRate = 0;
+        let daysWorked = 0;
+        for (let i = 0; i < 7; i++) {
+            const currentDate = new Date(this.currentWeekStart);
+            currentDate.setDate(currentDate.getDate() + i);
+            const dateStr = this.formatDate(currentDate);
+            const dayExpenses = this.expenses[dateStr] || this.getDefaultExpenses();
+            const dayRate = this.getDayRate(dayExpenses.location);
+            if (dayRate > 0) daysWorked++;
+            totalDayRate += dayRate;
+        }
+        return { totalDayRate, daysWorked };
+    }
+
     updateDashboard() {
         const weeklyTotal = this.calculateWeeklyTotal();
-        const monthlyEstimate = weeklyTotal * 4.33; // Average weeks per month
-        
+        const { totalDayRate, daysWorked } = this.calculateWeeklyDayRateInfo();
+        const netProfit = totalDayRate - weeklyTotal;
+        const actualDayRate = daysWorked > 0 ? netProfit / daysWorked : 0;
+
         document.getElementById('weekly-total').textContent = this.formatCurrency(weeklyTotal);
-        document.getElementById('monthly-estimate').textContent = this.formatCurrency(monthlyEstimate);
+        document.getElementById('weekly-day-rate').textContent = this.formatCurrency(actualDayRate);
     }
 
     editDay(dateStr) {
