@@ -19,6 +19,8 @@ class OrangeContractApp {
         this.skippedParkingBookings = [];
         this.selectedDate = null;
         this.locations = ['Glasgow', 'Aberdeen', 'Southampton', 'Home'];
+        this.chuffStartDate = '2026-06-08';
+        this.chuffEndDate = '2026-12-08';
         this.db = null;
         this.useSupabase = false;
         this.googleAccessToken = null;
@@ -56,6 +58,7 @@ class OrangeContractApp {
         await this.loadAllData();
         await this.loadLinkedFreeAgentExpenses();
         this.loadLocations();
+        this.loadChuffSettings();
         await this.setupEventListeners();
         this.updateWeekDisplay();
         this.renderWeekTable();
@@ -67,6 +70,7 @@ class OrangeContractApp {
         this.updateMonthDisplay();
         this.renderMonthTable();
         this.renderSchedule();
+        this.renderChuffChart();
         await this.loadFreeAgentVisibility();
 
         // Register Service Worker for PWA
@@ -568,6 +572,9 @@ class OrangeContractApp {
             if (e.target === e.currentTarget) this.closeScheduleDetails();
         });
 
+        // Chuff Chart
+        document.getElementById('save-chuff-dates').addEventListener('click', () => this.saveChuffDates());
+
         // Monthly Dashboard
         document.getElementById('prev-month').addEventListener('click', () => this.changeMonth(-1));
         document.getElementById('next-month').addEventListener('click', () => this.changeMonth(1));
@@ -673,11 +680,12 @@ class OrangeContractApp {
         // Show selected section
         document.getElementById(`${sectionName}-section`).classList.add('active');
         
-        // Add active class to clicked button
-        document.querySelector(`[data-section="${sectionName}"]`).classList.add('active');
+        // Add active class to all matching nav buttons
+        document.querySelectorAll(`[data-section="${sectionName}"]`).forEach(btn => btn.classList.add('active'));
 
         if (sectionName === 'schedule') this.renderSchedule();
         if (sectionName === 'fare-watch') this.renderFareWatch();
+        if (sectionName === 'chuff-chart') this.renderChuffChart();
     }
 
     changeWeek(direction) {
@@ -1258,6 +1266,168 @@ class OrangeContractApp {
 
         document.getElementById('weekly-total').textContent = this.formatCurrency(weeklyTotal);
         document.getElementById('weekly-day-rate').textContent = this.formatCurrency(actualDayRate);
+    }
+
+    // ─── Chuff Chart ─────────────────────────────────────────────────────────────
+
+    loadChuffSettings() {
+        try {
+            const saved = JSON.parse(localStorage.getItem('orange-contract-chuff') || '{}');
+            if (saved.startDate) this.chuffStartDate = saved.startDate;
+            if (saved.endDate) this.chuffEndDate = saved.endDate;
+        } catch (e) {
+            console.warn('Failed to load Chuff Chart settings:', e);
+        }
+    }
+
+    saveChuffSettings() {
+        try {
+            localStorage.setItem('orange-contract-chuff', JSON.stringify({
+                startDate: this.chuffStartDate,
+                endDate: this.chuffEndDate
+            }));
+        } catch (e) {
+            console.warn('Failed to save Chuff Chart settings:', e);
+        }
+    }
+
+    parseUTCDate(dateStr) {
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(Date.UTC(year, month - 1, day));
+    }
+
+    countWeekdays(fromStr, toStr) {
+        const from = this.parseUTCDate(fromStr);
+        const to = this.parseUTCDate(toStr);
+        let total = 0;
+        const current = new Date(from.getTime());
+        while (current.getTime() <= to.getTime()) {
+            const day = current.getUTCDay();
+            if (day >= 1 && day <= 5) total++;
+            current.setUTCDate(current.getUTCDate() + 1);
+        }
+        return total;
+    }
+
+    countLeaveDaysInRange(rangeStartStr, rangeEndStr) {
+        const rangeStart = this.parseUTCDate(rangeStartStr);
+        const rangeEnd = this.parseUTCDate(rangeEndStr);
+        let total = 0;
+        const current = new Date(rangeStart.getTime());
+        while (current.getTime() <= rangeEnd.getTime()) {
+            const day = current.getUTCDay();
+            if (day >= 1 && day <= 5) {
+                const dateStr = current.toISOString().split('T')[0];
+                const expenses = this.expenses[dateStr];
+                if (expenses && expenses.location === 'Leave') {
+                    total++;
+                }
+            }
+            current.setUTCDate(current.getUTCDate() + 1);
+        }
+        return total;
+    }
+
+    calculateChuffStats() {
+        const totalDays = Math.max(0, this.countWeekdays(this.chuffStartDate, this.chuffEndDate) - this.countLeaveDaysInRange(this.chuffStartDate, this.chuffEndDate));
+        const today = this.formatDate(new Date());
+
+        let daysDone = 0;
+        if (today >= this.chuffStartDate) {
+            const elapsedEnd = today <= this.chuffEndDate ? today : this.chuffEndDate;
+            const elapsedWorking = this.countWeekdays(this.chuffStartDate, elapsedEnd);
+            const elapsedLeave = this.countLeaveDaysInRange(this.chuffStartDate, elapsedEnd);
+            daysDone = Math.max(0, elapsedWorking - elapsedLeave);
+        }
+        daysDone = Math.min(daysDone, totalDays);
+
+        const daysToDo = totalDays - daysDone;
+        const totalWeeks = totalDays / 5;
+        const weeksDone = daysDone / 5;
+        const weeksToDo = totalWeeks - weeksDone;
+        const totalMonths = totalDays / 21.67;
+        const monthsDone = daysDone / 21.67;
+        const monthsToDo = totalMonths - monthsDone;
+        const percent = totalDays > 0 ? (daysDone / totalDays) * 100 : 0;
+
+        return { totalDays, daysDone, daysToDo, totalWeeks, weeksDone, weeksToDo, totalMonths, monthsDone, monthsToDo, percent };
+    }
+
+    saveChuffDates() {
+        const start = document.getElementById('chuff-start-date').value;
+        const end = document.getElementById('chuff-end-date').value;
+        if (!start || !end) return this.showErrorMessage('Both start and end dates are required.');
+        if (end < start) return this.showErrorMessage('End date must be on or after the start date.');
+        this.chuffStartDate = start;
+        this.chuffEndDate = end;
+        this.saveChuffSettings();
+        this.renderChuffChart();
+        this.showSuccessMessage('Tour dates updated.');
+    }
+
+    renderChuffChart() {
+        const startInput = document.getElementById('chuff-start-date');
+        const endInput = document.getElementById('chuff-end-date');
+        if (!startInput || !endInput) return;
+
+        startInput.value = this.chuffStartDate;
+        endInput.value = this.chuffEndDate;
+
+        const ticksGroup = document.getElementById('chuff-gauge-ticks');
+        if (ticksGroup && ticksGroup.children.length === 0) {
+            for (let i = 0; i <= 20; i++) {
+                const percent = i / 20;
+                const angleDeg = 135 + percent * 270;
+                const angleRad = angleDeg * Math.PI / 180;
+                const isMajor = i % 5 === 0;
+                const r1 = isMajor ? 54 : 58;
+                const r2 = 64;
+                const x1 = 100 + r1 * Math.cos(angleRad);
+                const y1 = 100 + r1 * Math.sin(angleRad);
+                const x2 = 100 + r2 * Math.cos(angleRad);
+                const y2 = 100 + r2 * Math.sin(angleRad);
+                ticksGroup.innerHTML += `<line class="chuff-gauge-tick ${isMajor ? 'major' : ''}" x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" />`;
+            }
+        }
+
+        const stats = this.calculateChuffStats();
+        const fmt = val => Number.isInteger(val) ? val : val.toFixed(1);
+        document.getElementById('chuff-days-done').textContent = stats.daysDone;
+        document.getElementById('chuff-days-to-do').textContent = stats.daysToDo;
+        document.getElementById('chuff-total-days').textContent = stats.totalDays;
+        document.getElementById('chuff-weeks-done').textContent = fmt(stats.weeksDone);
+        document.getElementById('chuff-weeks-to-do').textContent = fmt(stats.weeksToDo);
+        document.getElementById('chuff-total-weeks').textContent = fmt(stats.totalWeeks);
+        document.getElementById('chuff-months-done').textContent = fmt(stats.monthsDone);
+        document.getElementById('chuff-months-to-do').textContent = fmt(stats.monthsToDo);
+        document.getElementById('chuff-total-months').textContent = fmt(stats.totalMonths);
+
+        const needle = document.getElementById('chuff-gauge-needle');
+        const percentDisplay = document.getElementById('chuff-percent');
+        const clampedPercent = Math.min(100, Math.max(0, stats.percent));
+        const needleRotation = clampedPercent * 2.7;
+
+        if (needle) {
+            needle.style.transition = 'none';
+            needle.style.transform = 'rotate(0deg)';
+            void needle.offsetWidth;
+            needle.style.transition = 'transform 1.4s cubic-bezier(0.22, 1, 0.36, 1)';
+            setTimeout(() => { needle.style.transform = `rotate(${needleRotation}deg)`; }, 30);
+        }
+
+        this.animateChuffPercent(0, clampedPercent, 1400, percentDisplay);
+    }
+
+    animateChuffPercent(from, to, duration, element) {
+        if (!element) return;
+        const start = performance.now();
+        const step = (now) => {
+            const progress = Math.min((now - start) / duration, 1);
+            const current = from + (to - from) * progress;
+            element.textContent = current.toFixed(1).replace(/\.0$/, '') + '%';
+            if (progress < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
     }
 
     editDay(dateStr) {

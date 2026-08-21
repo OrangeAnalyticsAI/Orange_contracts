@@ -1,11 +1,11 @@
-const CACHE_NAME = 'orange-contract-v30';
+const CACHE_NAME = 'orange-contract-v34';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
-  './styles.css?v=30',
+  './styles.css?v=31',
   './script.js',
-  './script.js?v=30',
+  './script.js?v=31',
   './credentials.js',
   './manifest.json',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',

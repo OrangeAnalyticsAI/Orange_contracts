@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Orange Contract - Weekly Travel Expense Tracker</title>
     <meta name="referrer" content="strict-origin-when-cross-origin">
-    <link rel="stylesheet" href="styles.css?v=30">
+    <link rel="stylesheet" href="styles.css?v=34">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -33,14 +33,15 @@
 
     <header>
         <h1>🍊 Orange Contract</h1>
-        <p>Weekly Travel Expense Tracker for Scotland</p>
         <nav class="main-nav">
             <button class="nav-btn active" data-section="dashboard">Weekly</button>
             <button class="nav-btn" data-section="monthly">Monthly</button>
             <button class="nav-btn" data-section="schedule">Schedule</button>
             <button class="nav-btn" data-section="fare-watch">Fare Watch</button>
+            <button class="nav-btn chuff-nav-desktop" data-section="chuff-chart">Chuff Chart</button>
             <button id="nav-hamburger" class="nav-hamburger" type="button" aria-label="More sections" aria-expanded="false" aria-controls="nav-secondary">☰</button>
             <div class="nav-secondary" id="nav-secondary">
+                <button class="nav-btn chuff-nav-mobile" data-section="chuff-chart">Chuff Chart</button>
                 <button class="nav-btn" data-section="bookings">Flights</button>
                 <button class="nav-btn" data-section="parking">Parking</button>
                 <button class="nav-btn" data-section="accommodation">Accommodation</button>
@@ -155,6 +156,106 @@
                 <h3>Export for FreeAgent</h3>
                 <button id="export-csv">Export to CSV</button>
                 <button id="export-json">Export to JSON</button>
+            </section>
+        </section>
+
+        <section id="chuff-chart-section" class="content-section">
+            <section class="chuff-hero">
+                <div>
+                    <span class="fare-watch-kicker">Tour countdown</span>
+                    <h2>Chuff Chart</h2>
+                    <p>Track how far through the contract tour you've travelled and how long before you're home.</p>
+                </div>
+            </section>
+
+            <section class="chuff-chart-panel">
+                <div class="chuff-chart-body">
+                    <div class="chuff-stats-left">
+                        <div class="chuff-stat-group">
+                            <h4>Days</h4>
+                            <div class="chuff-stat-row">
+                                <div class="chuff-stat"><span>Done</span><strong id="chuff-days-done">0</strong></div>
+                                <div class="chuff-stat"><span>To Do</span><strong id="chuff-days-to-do">0</strong></div>
+                                <div class="chuff-stat"><span>Total</span><strong id="chuff-total-days">0</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chuff-gauge-column">
+                        <div class="chuff-gauge-wrap">
+                            <svg class="chuff-gauge" viewBox="0 0 200 195" aria-label="Tour completion gauge">
+                                <defs>
+                                    <linearGradient id="chuff-case-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" stop-color="#1a2636" />
+                                        <stop offset="50%" stop-color="#0d161f" />
+                                        <stop offset="100%" stop-color="#05090d" />
+                                    </linearGradient>
+                                    <path id="chuff-curve" d="M 60 100 A 40 40 0 0 1 140 100" fill="none" />
+                                </defs>
+                                <rect class="chuff-gauge-case" x="10" y="10" width="180" height="180" rx="22" ry="22" />
+                                <rect class="chuff-gauge-case-shadow" x="15" y="15" width="170" height="170" rx="20" ry="20" />
+                                <circle class="chuff-gauge-housing" cx="100" cy="100" r="82" />
+                                <circle class="chuff-gauge-face" cx="100" cy="100" r="76" />
+                                <circle class="chuff-gauge-screw" cx="22" cy="22" r="3.5" />
+                                <circle class="chuff-gauge-screw" cx="178" cy="22" r="3.5" />
+                                <circle class="chuff-gauge-screw" cx="22" cy="178" r="3.5" />
+                                <circle class="chuff-gauge-screw" cx="178" cy="178" r="3.5" />
+                                <path class="chuff-gauge-arc chuff-gauge-arc-black" d="M 50.5 149.5 A 70 70 0 0 1 50.5 50.5" />
+                                <path class="chuff-gauge-arc chuff-gauge-arc-amber" d="M 50.5 50.5 A 70 70 0 0 1 149.5 50.5" />
+                                <path class="chuff-gauge-arc chuff-gauge-arc-green" d="M 149.5 50.5 A 70 70 0 0 1 149.5 149.5" />
+                                <g id="chuff-gauge-ticks"></g>
+                                <text class="chuff-gauge-curve-text">
+                                    <textPath href="#chuff-curve" startOffset="50%" text-anchor="middle">TOUR COMPLETION</textPath>
+                                </text>
+                                <text id="chuff-percent" class="chuff-gauge-percent" x="100" y="150" text-anchor="middle">0%</text>
+                                <g id="chuff-gauge-needle" class="chuff-gauge-needle">
+                                    <polygon points="96.28 107.60 92.40 101.72 61.29 134.83 54.74 145.26 65.17 138.71" />
+                                </g>
+                                <circle class="chuff-gauge-pivot" cx="100" cy="100" r="5" />
+                                <text class="chuff-gauge-label" x="50.5" y="118">0</text>
+                                <text class="chuff-gauge-label" x="100" y="28">50</text>
+                                <text class="chuff-gauge-label" x="149.5" y="118">100</text>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div class="chuff-stats-right">
+                        <div class="chuff-stat-group">
+                            <h4>Weeks</h4>
+                            <div class="chuff-stat-row">
+                                <div class="chuff-stat"><span>Done</span><strong id="chuff-weeks-done">0</strong></div>
+                                <div class="chuff-stat"><span>To Do</span><strong id="chuff-weeks-to-do">0</strong></div>
+                                <div class="chuff-stat"><span>Total</span><strong id="chuff-total-weeks">0</strong></div>
+                            </div>
+                        </div>
+                        <div class="chuff-stat-group">
+                            <h4>Months</h4>
+                            <div class="chuff-stat-row">
+                                <div class="chuff-stat"><span>Done</span><strong id="chuff-months-done">0</strong></div>
+                                <div class="chuff-stat"><span>To Do</span><strong id="chuff-months-to-do">0</strong></div>
+                                <div class="chuff-stat"><span>Total</span><strong id="chuff-total-months">0</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="chuff-config-panel">
+                <h3>Tour Dates</h3>
+                <div class="chuff-config-grid">
+                    <div class="form-group">
+                        <label for="chuff-start-date">Start Date</label>
+                        <input type="date" id="chuff-start-date">
+                    </div>
+                    <div class="form-group">
+                        <label for="chuff-end-date">End Date</label>
+                        <input type="date" id="chuff-end-date">
+                    </div>
+                    <div class="form-group chuff-config-actions">
+                        <button type="button" id="save-chuff-dates">Update Dates</button>
+                    </div>
+                </div>
+                <p class="chuff-config-note">Adjust the end date when the tour is extended. Leave days are automatically excluded when a day's location is set to "Leave" in the weekly or monthly tables.</p>
             </section>
         </section>
 
@@ -872,6 +973,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="credentials.js"></script>
-    <script src="script.js?v=30"></script>
+    <script src="script.js?v=34"></script>
 </body>
 </html>
