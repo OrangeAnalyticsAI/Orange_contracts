@@ -58,7 +58,7 @@ class OrangeContractApp {
         await this.loadAllData();
         await this.loadLinkedFreeAgentExpenses();
         this.loadLocations();
-        this.loadChuffSettings();
+        await this.loadChuffSettings();
         await this.setupEventListeners();
         this.updateWeekDisplay();
         this.renderWeekTable();
@@ -1270,24 +1270,66 @@ class OrangeContractApp {
 
     // ─── Chuff Chart ─────────────────────────────────────────────────────────────
 
-    loadChuffSettings() {
-        try {
-            const saved = JSON.parse(localStorage.getItem('orange-contract-chuff') || '{}');
-            if (saved.startDate) this.chuffStartDate = saved.startDate;
-            if (saved.endDate) this.chuffEndDate = saved.endDate;
-        } catch (e) {
-            console.warn('Failed to load Chuff Chart settings:', e);
+    async loadChuffSettings() {
+        if (this.useSupabase && this.db) {
+            try {
+                const { data, error } = await this.db
+                    .from('app_settings')
+                    .select('key, value')
+                    .in('key', ['chuff_start_date', 'chuff_end_date']);
+                if (error) console.warn('Failed to load Chuff Chart settings from Supabase:', error);
+
+                const start = data?.find(r => r.key === 'chuff_start_date')?.value;
+                const end = data?.find(r => r.key === 'chuff_end_date')?.value;
+
+                if (start && end) {
+                    this.chuffStartDate = start;
+                    this.chuffEndDate = end;
+                    return;
+                }
+
+                // Migrate any existing localStorage settings to Supabase
+                const saved = JSON.parse(localStorage.getItem('orange-contract-chuff') || '{}');
+                if (saved.startDate) this.chuffStartDate = saved.startDate;
+                if (saved.endDate) this.chuffEndDate = saved.endDate;
+                localStorage.removeItem('orange-contract-chuff');
+                await this.saveChuffSettings();
+            } catch (e) {
+                console.warn('Failed to load Chuff Chart settings:', e);
+            }
+        } else {
+            try {
+                const saved = JSON.parse(localStorage.getItem('orange-contract-chuff') || '{}');
+                if (saved.startDate) this.chuffStartDate = saved.startDate;
+                if (saved.endDate) this.chuffEndDate = saved.endDate;
+            } catch (e) {
+                console.warn('Failed to load Chuff Chart settings:', e);
+            }
         }
     }
 
-    saveChuffSettings() {
-        try {
-            localStorage.setItem('orange-contract-chuff', JSON.stringify({
-                startDate: this.chuffStartDate,
-                endDate: this.chuffEndDate
-            }));
-        } catch (e) {
-            console.warn('Failed to save Chuff Chart settings:', e);
+    async saveChuffSettings() {
+        if (this.useSupabase && this.db) {
+            this.setSyncStatus('saving');
+            const { error } = await this.db.from('app_settings').upsert([
+                { key: 'chuff_start_date', value: this.chuffStartDate },
+                { key: 'chuff_end_date', value: this.chuffEndDate }
+            ]);
+            if (error) {
+                console.error('Error saving Chuff Chart settings:', error);
+                this.setSyncStatus('offline');
+            } else {
+                this.setSyncStatus('connected');
+            }
+        } else {
+            try {
+                localStorage.setItem('orange-contract-chuff', JSON.stringify({
+                    startDate: this.chuffStartDate,
+                    endDate: this.chuffEndDate
+                }));
+            } catch (e) {
+                console.warn('Failed to save Chuff Chart settings:', e);
+            }
         }
     }
 
@@ -1353,14 +1395,14 @@ class OrangeContractApp {
         return { totalDays, daysDone, daysToDo, totalWeeks, weeksDone, weeksToDo, totalMonths, monthsDone, monthsToDo, percent };
     }
 
-    saveChuffDates() {
+    async saveChuffDates() {
         const start = document.getElementById('chuff-start-date').value;
         const end = document.getElementById('chuff-end-date').value;
         if (!start || !end) return this.showErrorMessage('Both start and end dates are required.');
         if (end < start) return this.showErrorMessage('End date must be on or after the start date.');
         this.chuffStartDate = start;
         this.chuffEndDate = end;
-        this.saveChuffSettings();
+        await this.saveChuffSettings();
         this.renderChuffChart();
         this.showSuccessMessage('Tour dates updated.');
     }
