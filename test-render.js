@@ -247,6 +247,15 @@ check('details: rows rendered', detailsHtml.includes('schedule-detail-row'));
 check('details: reference shown', detailsHtml.includes('K3M9QP2'));
 assertClean('details', detailsHtml);
 
+app.bookings = [{
+    id: 'b2', flightNumber: 'EZY1234', route: 'Glasgow → Bristol', date: app.formatDate(new Date()),
+    departureTime: '18:00', arrivalTime: '19:20', pricePaid: 55, bookingRef: 'XYZ987', seat: '4B', notes: 'Flex Pass not used'
+}];
+app.renderSchedule();
+const flexHtml = html('schedule-calendar');
+check('schedule: flex pass badge shown', flexHtml.includes('flex-pass-badge'));
+check('schedule: flex pass badge labelled', flexHtml.includes('title="Flex pass not used"'));
+
 // ─── 6. Week and month tables ──────────────────────────────────────────────────
 
 app.locations = ['Glasgow', XSS_ATTR];
@@ -397,7 +406,7 @@ listeners.fetch({
 check('sw: POST requests are not intercepted', responded === false);
 
 listeners.fetch({
-    request: { method: 'GET', url: 'https://app.example.com/script.js?v=30' },
+    request: { method: 'GET', url: 'https://app.example.com/script.js?v=42' },
     respondWith() { responded = true; }
 });
 check('sw: GET requests are still served from cache', responded === true);
@@ -410,13 +419,13 @@ listeners.fetch({
 check('sw: Supabase requests still bypass the cache', bypassed === true);
 
 check('sw: versioned asset URLs are precached',
-    swSource.includes("'./script.js?v=30'") && swSource.includes("'./styles.css?v=30'"));
+    swSource.includes("'./script.js?v=42'") && swSource.includes("'./styles.css?v=42'"));
 check('sw: credentials.js is precached', swSource.includes("'./credentials.js'"));
 
 // ─── 12. index.html sanity ─────────────────────────────────────────────────────
 
 const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-check('index: script and styles still referenced', indexHtml.includes('script.js?v=30') && indexHtml.includes('styles.css?v=30'));
+check('index: script and styles still referenced', indexHtml.includes('script.js?v=42') && indexHtml.includes('styles.css?v=42'));
 check('index: font stylesheet still loaded', indexHtml.includes('fonts.googleapis.com/css2'));
 check('index: preconnect hints added', indexHtml.includes('rel="preconnect" href="https://fonts.gstatic.com"'));
 check('index: every _blank link has noopener',

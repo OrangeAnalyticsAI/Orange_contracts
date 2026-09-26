@@ -395,6 +395,77 @@ class OrangeContractApp {
         this.fareWatchAlerts = alerts || [];
         this.renderFareWatch();
         this.showFareWatchNotifications();
+        this.loadApifyUsage();
+    }
+
+    async loadApifyUsage() {
+        const timeoutMs = 15000;
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            const { data, error } = await this.db.functions.invoke('monitor-flight-prices', {
+                body: { action: 'usage' },
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            if (error) {
+                const detail = error.context ? await error.context.json().catch(() => ({})) : {};
+                throw new Error(detail.error || detail.message || error.message || 'Usage request failed');
+            }
+            this.renderApifyUsage(data?.usage || null);
+        } catch (err) {
+            console.error('Failed to load Apify usage:', err);
+            this.renderApifyUsage(null, err.name === 'AbortError' ? 'Usage check timed out' : 'Unable to load usage');
+        }
+    }
+
+    renderApifyUsage(usage, errorMessage = null) {
+        const valueEl = document.getElementById('fare-watch-usage-value');
+        const gaugeEl = document.getElementById('fare-watch-usage-gauge');
+        const messageEl = document.getElementById('fare-watch-usage-message');
+        if (!valueEl || !gaugeEl || !messageEl) return;
+
+        if (errorMessage || !usage || usage.limit == null) {
+            valueEl.textContent = errorMessage || 'Not available';
+            gaugeEl.innerHTML = '';
+            messageEl.textContent = 'Usage data is unavailable. Auto-checks still run only for active tracking flights.';
+            messageEl.className = 'usage-message';
+            return;
+        }
+
+        const percentage = Number(usage.percentage) || 0;
+        const used = Number(usage.used) || 0;
+        const limit = Number(usage.limit) || 0;
+        const status = usage.status || 'green';
+        const segments = 10;
+        const filled = Math.min(Math.ceil((percentage / 100) * segments), segments);
+
+        let gaugeHtml = '';
+        for (let i = 0; i < segments; i++) {
+            let segmentClass = '';
+            if (i < filled) {
+                // Aviation-style zones: green 0-70%, amber 70-90%, red 90%+.
+                if (i < 7) segmentClass = 'active-green';
+                else if (i < 9) segmentClass = 'active-amber';
+                else segmentClass = 'active-red';
+            }
+            gaugeHtml += `<span class="usage-segment ${segmentClass}"></span>`;
+        }
+        gaugeEl.innerHTML = gaugeHtml;
+
+        const icon = status === 'red' ? '!' : '';
+        valueEl.innerHTML = `$${used.toFixed(2)} / $${limit.toFixed(2)} (${percentage.toFixed(0)}%)${icon ? ` <span class="usage-status-icon">${icon}</span>` : ''}`;
+
+        let message = 'Auto-checks run only for active tracking flights. Booked flights are checked on demand.';
+        messageEl.className = 'usage-message';
+        if (status === 'red') {
+            message = `Usage limit exceeded. Auto-checks are paused until the next cycle or you upgrade.`;
+            messageEl.classList.add('usage-warning');
+        } else if (status === 'amber') {
+            message = `Approaching the $${limit.toFixed(2)} monthly limit. Consider reducing check frequency or upgrading.`;
+            messageEl.classList.add('usage-amber');
+        }
+        messageEl.textContent = message;
     }
 
     // ─── Persist expenses ──────────────────────────────────────────────────────
@@ -684,8 +755,12 @@ class OrangeContractApp {
         document.querySelectorAll(`[data-section="${sectionName}"]`).forEach(btn => btn.classList.add('active'));
 
         if (sectionName === 'schedule') this.renderSchedule();
-        if (sectionName === 'fare-watch') this.renderFareWatch();
+        if (sectionName === 'fare-watch') {
+            this.renderFareWatch();
+            this.loadApifyUsage();
+        }
         if (sectionName === 'chuff-chart') this.renderChuffChart();
+        if (sectionName === 'import') this.restoreGmailSearchCache();
     }
 
     changeWeek(direction) {
@@ -712,7 +787,8 @@ class OrangeContractApp {
                 id: booking.id,
                 time: booking.departureTime || '',
                 title: booking.flightNumber || 'Flight',
-                subtitle: booking.route || 'Route not recorded'
+                subtitle: booking.route || 'Route not recorded',
+                notes: booking.notes || ''
             }));
 
         const parking = this.parkingBookings.flatMap(booking => {
@@ -810,13 +886,16 @@ class OrangeContractApp {
                     </div>
                     ${items.length > 2 ? `<div class="schedule-day-flag" title="${items.length} bookings on this day — scroll to check for duplicates">⚠ ${items.length} bookings — swipe to check for duplicates</div>` : ''}
                     <div class="schedule-day-items">
-                        ${items.length ? items.map(item => `
+                        ${items.length ? items.map(item => {
+                            const hasFlexPass = item.type === 'flight' && /flex\s*pass\s+not\s+used/i.test(item.notes || '');
+                            return `
                             <button class="schedule-item ${safe(item.type)}" type="button" data-type="${safe(item.type)}" data-id="${safe(item.id)}">
                                 <span class="schedule-item-type">${safe(item.type)}</span>
                                 <strong>${item.time ? `${safe(item.time)} · ` : ''}${safe(item.title)}</strong>
-                                <small>${safe(item.subtitle)}</small>
+                                <small>${safe(item.subtitle)}${hasFlexPass ? ' <span class="flex-pass-badge" title="Flex pass not used">F</span>' : ''}</small>
                             </button>
-                        `).join('') : '<span class="schedule-empty">No bookings</span>'}
+                        `;
+                        }).join('') : '<span class="schedule-empty">No bookings</span>'}
                     </div>
                 </article>
             `);
@@ -1973,7 +2052,7 @@ class OrangeContractApp {
         const { error } = await this.db.from('planned_flights').update(update).eq('id', id);
         if (error) return this.showErrorMessage(error.message);
         await this.loadFareWatchData();
-        this.showSuccessMessage(status === 'booked' ? 'Marked as booked. Fare tracking continues in the Booked section.' : status === 'paused' ? 'Price watch paused.' : 'Price watch resumed.');
+        this.showSuccessMessage(status === 'booked' ? 'Marked as booked. Auto price checks stop; use Check now in Booked for an on-demand refresh.' : status === 'paused' ? 'Price watch paused.' : 'Price watch resumed.');
     }
 
     async deletePlannedFlight(id) {
@@ -2080,17 +2159,6 @@ class OrangeContractApp {
         const container = document.getElementById('planned-flights-list');
         if (!container) return;
         this.renderFareWatchAlerts();
-        const tracked = this.plannedFlights.filter(flight => flight.status === 'tracking');
-        document.getElementById('fare-stat-tracked').textContent = tracked.length;
-        document.getElementById('fare-stat-book-now').textContent = tracked.filter(flight => flight.recommendation === 'book_now').length;
-        const savings = tracked.map(flight => {
-            const prices = (flight.flight_price_snapshots || []).map(snapshot => Number(snapshot.total_price));
-            return prices.length && flight.latest_total_price ? Math.max(...prices) - Number(flight.latest_total_price) : 0;
-        });
-        const bestSaving = Math.max(0, ...savings);
-        document.getElementById('fare-stat-saving').textContent = bestSaving !== 0 ? this.formatCurrency(bestSaving) : '—';
-        const checks = tracked.map(flight => flight.last_checked_at).filter(Boolean).sort().reverse();
-        document.getElementById('fare-stat-last-scan').textContent = checks.length ? this.formatRelativeFareWatchTime(checks[0]) : 'Not yet';
         if (!this.plannedFlights.length) {
             container.innerHTML = '<div class="fare-watch-empty">No flights are being watched yet. Plan a trip to start building daily price intelligence.</div>';
             return;
@@ -2125,7 +2193,7 @@ class OrangeContractApp {
         const sources = Array.isArray(flight.event_sources) ? flight.event_sources : [];
         const bookingUrl = this.buildEasyJetBookingUrl(flight);
         const bookingLink = bookingUrl?.startsWith('https://')
-            ? `<a class="settings-link-button" href="${safe(bookingUrl)}" target="_blank" rel="noopener">Book on easyJet</a>` : '';
+            ? `<a class="settings-link-button btn-book" href="${safe(bookingUrl)}" target="_blank" rel="noopener">Book on easyJet</a>` : '';
         return `<article class="planned-flight-card ${recommendationClass} ${safe(flight.status)}">
             <header class="planned-flight-card-header">
                 <div>
@@ -2155,8 +2223,8 @@ class OrangeContractApp {
                 <span class="last-checked">${flight.last_checked_at ? `Checked ${safe(this.formatRelativeFareWatchTime(flight.last_checked_at))}` : 'Not checked yet'}${flight.target_price ? ` · Target ${this.formatCurrency(flight.target_price)}` : ''}</span>
                 <div class="planned-flight-actions">
                     ${bookingLink}
-                    ${flight.status !== 'booked' ? `<button data-fare-action="check" data-flight-id="${safe(flight.id)}">Check now</button><button data-fare-action="edit" data-flight-id="${safe(flight.id)}">Edit</button><button class="secondary-btn" data-fare-action="pause" data-flight-id="${safe(flight.id)}">${flight.status === 'paused' ? 'Resume' : 'Pause'}</button><button class="secondary-btn" data-fare-action="booked" data-flight-id="${safe(flight.id)}">Mark booked</button>` : ''}
-                    <button class="danger" data-fare-action="delete" data-flight-id="${safe(flight.id)}">Delete</button>
+                    ${flight.status !== 'booked' ? `<button class="btn-check" data-fare-action="check" data-flight-id="${safe(flight.id)}">Check now</button><button class="btn-edit" data-fare-action="edit" data-flight-id="${safe(flight.id)}">Edit</button><button class="btn-pause" data-fare-action="pause" data-flight-id="${safe(flight.id)}">${flight.status === 'paused' ? 'Resume' : 'Pause'}</button><button class="btn-booked" data-fare-action="booked" data-flight-id="${safe(flight.id)}">Mark booked</button>` : ''}
+                    <button class="danger btn-delete" data-fare-action="delete" data-flight-id="${safe(flight.id)}">Delete</button>
                 </div>
             </footer>
         </article>`;
@@ -2195,8 +2263,8 @@ class OrangeContractApp {
             <footer class="planned-flight-card-footer">
                 <span class="last-checked">${flight.last_checked_at ? `Checked ${safe(this.formatRelativeFareWatchTime(flight.last_checked_at))}` : 'Not checked yet'}</span>
                 <div class="planned-flight-actions">
-                    <button data-fare-action="check" data-flight-id="${safe(flight.id)}">Check now</button>
-                    <button class="danger" data-fare-action="delete" data-flight-id="${safe(flight.id)}">Delete</button>
+                    <button class="btn-check" data-fare-action="check" data-flight-id="${safe(flight.id)}">Check now</button>
+                    <button class="danger btn-delete" data-fare-action="delete" data-flight-id="${safe(flight.id)}">Delete</button>
                 </div>
             </footer>
         </article>`;
@@ -2799,6 +2867,10 @@ class OrangeContractApp {
         document.getElementById('gmail-connect-btn').classList.remove('hidden');
         document.getElementById('gmail-disconnect-btn').classList.add('hidden');
         document.getElementById('gmail-results').classList.add('hidden');
+        this._gmailFound = null;
+        this._gmailParkingFound = null;
+        this._clearGmailSearchCache('flights');
+        this._clearGmailSearchCache('parking');
         this.setGmailStatus('ready', 'Disconnected from Gmail');
     }
 
@@ -2832,6 +2904,56 @@ class OrangeContractApp {
         if (!statusEl || !dotEl) return;
         statusEl.textContent = text;
         dotEl.className = 'gmail-dot ' + state;
+    }
+
+    _saveGmailSearchCache(type, found, lastSearchExtracted) {
+        try {
+            localStorage.setItem(`orange-contract-gmail-${type}`, JSON.stringify({
+                found,
+                lastSearchExtracted: !!lastSearchExtracted,
+                timestamp: Date.now()
+            }));
+        } catch (e) {
+            console.error('Failed to save Gmail search cache:', e);
+        }
+    }
+
+    _loadGmailSearchCache(type) {
+        try {
+            const raw = localStorage.getItem(`orange-contract-gmail-${type}`);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            console.error('Failed to load Gmail search cache:', e);
+            return null;
+        }
+    }
+
+    _clearGmailSearchCache(type) {
+        localStorage.removeItem(`orange-contract-gmail-${type}`);
+    }
+
+    restoreGmailSearchCache() {
+        const flightCache = this._loadGmailSearchCache('flights');
+        if (flightCache && flightCache.found && flightCache.found.length) {
+            this._lastSearchExtracted = flightCache.lastSearchExtracted;
+            this._gmailFound = flightCache.found;
+            const resultsDiv = document.getElementById('gmail-results');
+            if (resultsDiv) {
+                resultsDiv.classList.remove('hidden');
+                this.renderGmailResults(flightCache.found);
+            }
+        }
+
+        const parkingCache = this._loadGmailSearchCache('parking');
+        if (parkingCache && parkingCache.found && parkingCache.found.length) {
+            this._lastSearchExtracted = parkingCache.lastSearchExtracted;
+            this._gmailParkingFound = parkingCache.found;
+            const resultsDiv = document.getElementById('gmail-results');
+            if (resultsDiv) {
+                resultsDiv.classList.remove('hidden');
+                this.renderGmailParkingResults(parkingCache.found);
+            }
+        }
     }
 
     async searchGmailBookings() {
@@ -2889,6 +3011,7 @@ class OrangeContractApp {
             if (messages.length === 0) {
                 resultsDiv.innerHTML = '<div class="gmail-empty">No matching flight booking emails found in your Gmail account.</div>';
                 logDebug('Exit: 0 matching messages in Gmail query.');
+                this._saveGmailSearchCache('flights', found, this._lastSearchExtracted);
                 return;
             }
 
@@ -3151,6 +3274,7 @@ ${body}`;
 
             logDebug("----------------------------------------");
             logDebug("Process Complete! Total suggested imports displayed: " + found.length);
+            this._saveGmailSearchCache('flights', found, this._lastSearchExtracted);
             this.renderGmailResults(found);
 
         } catch (err) {
@@ -3215,6 +3339,7 @@ ${body}`;
             if (messages.length === 0) {
                 resultsDiv.innerHTML = '<div class="gmail-empty">No matching parking booking emails found in your Gmail account.</div>';
                 logDebug('Exit: 0 matching messages in Gmail query.');
+                this._saveGmailSearchCache('parking', found, this._lastSearchExtracted);
                 return;
             }
 
@@ -3346,6 +3471,7 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
 
             logDebug("----------------------------------------");
             logDebug("Process Complete! Total suggested imports displayed: " + found.length);
+            this._saveGmailSearchCache('parking', found, this._lastSearchExtracted);
             this.renderGmailParkingResults(found);
 
         } catch (err) {
@@ -3395,13 +3521,22 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
                     </div>
                     <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
                         <button onclick="app.importGmailParkingBooking(${i})" class="gmail-import-btn" style="padding: 0.35rem 0.75rem; ${importBtnStyle}" ${disabledAttr}>${importBtnText}</button>
-                        ${!isSkipped ? `<button onclick="document.getElementById('gmail-parking-item-${i}').remove()" class="gmail-skip-btn" style="background:#475569; padding: 0.35rem 0.75rem;">Skip Now</button>
+                        ${!isSkipped ? `<button onclick="app.skipGmailParkingBooking(${i})" class="gmail-skip-btn" style="background:#475569; padding: 0.35rem 0.75rem;">Skip Now</button>
                         <button onclick="app.alwaysSkipGmailParkingBooking(${i})" class="gmail-skip-btn" style="background:#ef4444; color:white; padding: 0.35rem 0.75rem;">🚫 Always Skip</button>` : ''}
                     </div>
                 </div>`;
             }).join('')}
         `;
         this._gmailParkingFound = sortedFound;
+    }
+
+    skipGmailParkingBooking(index) {
+        if (this._gmailParkingFound) {
+            this._gmailParkingFound.splice(index, 1);
+            this._saveGmailSearchCache('parking', this._gmailParkingFound, this._lastSearchExtracted);
+        }
+        const el = document.getElementById(`gmail-parking-item-${index}`);
+        if (el) el.remove();
     }
 
     async alwaysSkipGmailParkingBooking(index) {
@@ -3414,7 +3549,7 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
         }
         const skipDate = d.bookingDate || d.arrivalDate || '';
         await this.addToSkippedParkingBookings(d.bookingRef, skipDate);
-        document.getElementById(`gmail-parking-item-${index}`).remove();
+        this.skipGmailParkingBooking(index);
         this.showSuccessMessage(`Added parking Ref ${d.bookingRef} to blocklist.`);
     }
 
@@ -3447,10 +3582,14 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
         // Check for duplicate before importing
         const isDuplicate = await this.isParkingDuplicate(d);
         if (isDuplicate) {
+            this._gmailParkingFound.splice(index, 1);
+            this._saveGmailSearchCache('parking', this._gmailParkingFound, this._lastSearchExtracted);
             this.showErrorMessage('This parking booking already exists');
             return;
         }
 
+        this._gmailParkingFound.splice(index, 1);
+        this._saveGmailSearchCache('parking', this._gmailParkingFound, this._lastSearchExtracted);
         this.switchSection('parking');
         this.showParkingBookingForm({
             id: null,
@@ -3992,7 +4131,7 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
                     </div>
                     <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
                         <button onclick="app.importGmailBooking(${i})" class="gmail-import-btn" style="padding: 0.35rem 0.75rem;">➕ Import</button>
-                        <button onclick="document.getElementById('gmail-item-${i}').remove()" class="gmail-skip-btn" style="background:#475569; padding: 0.35rem 0.75rem;">Skip Now</button>
+                        <button onclick="app.skipGmailBooking(${i})" class="gmail-skip-btn" style="background:#475569; padding: 0.35rem 0.75rem;">Skip Now</button>
                         <button onclick="app.alwaysSkipGmailBooking(${i})" class="gmail-skip-btn" style="background:#ef4444; color:white; padding: 0.35rem 0.75rem;">🚫 Always Skip</button>
                     </div>
                 </div>`;
@@ -4000,6 +4139,15 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
         `;
         // Store found data for import
         this._gmailFound = found;
+    }
+
+    skipGmailBooking(index) {
+        if (this._gmailFound) {
+            this._gmailFound.splice(index, 1);
+            this._saveGmailSearchCache('flights', this._gmailFound, this._lastSearchExtracted);
+        }
+        const el = document.getElementById(`gmail-item-${index}`);
+        if (el) el.remove();
     }
 
     async alwaysSkipGmailBooking(index) {
@@ -4011,7 +4159,7 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
             return;
         }
         await this.addToSkippedBookings(d.bookingRef, d.date);
-        document.getElementById(`gmail-item-${index}`).remove();
+        this.skipGmailBooking(index);
         this.showSuccessMessage(`Added Ref ${d.bookingRef} on ${d.date} to blocklist.`);
     }
 
@@ -4020,6 +4168,8 @@ Return ONLY a valid JSON object (no markdown, no backticks, no wrap, just raw JS
         if (!item) return;
         const d = item.details;
         const route = d.departure && d.arrival ? `${d.departure} → ${d.arrival}` : (d.route || '');
+        this._gmailFound.splice(index, 1);
+        this._saveGmailSearchCache('flights', this._gmailFound, this._lastSearchExtracted);
         this.switchSection('bookings');
         this.showBookingForm({
             id: null,

@@ -149,6 +149,22 @@ async function getDatasetItems(datasetId: string, token: string) {
   return res.json();
 }
 
+async function fetchApifyUsage(token: string) {
+  const url = `https://api.apify.com/v2/users/me/limits?token=${encodeURIComponent(token)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Apify usage fetch failed (${res.status})`);
+  const payload = await res.json();
+  const limit = Number(payload.data?.limits?.maxMonthlyUsageUsd ?? 0);
+  const used = Number(payload.data?.current?.monthlyUsageUsd ?? 0);
+  const cycleStart = payload.data?.monthlyUsageCycle?.startAt || null;
+  const cycleEnd = payload.data?.monthlyUsageCycle?.endAt || null;
+  const percentage = limit > 0 ? Math.min((used / limit) * 100, 999) : 0;
+  let status = "green";
+  if (percentage >= 100) status = "red";
+  else if (percentage >= 75) status = "amber";
+  return { used, limit, percentage, status, cycleStart, cycleEnd };
+}
+
 function mapMemo23Candidate(item: any, desiredTime: string, flexMinutes: number) {
   const price = Number(item.price);
   const departureTime = item.departureTime || "";
@@ -406,8 +422,14 @@ async function handleStart(admin: any, body: any) {
   const token = Deno.env.get("APIFY_API_TOKEN");
   if (!token) return json({ error: "APIFY_API_TOKEN is not configured" }, 500);
 
-  let query = admin.from("planned_flights").select("*").in("status", ["tracking", "booked"]).gte("outbound_date", todayIso()).is("apify_run_id", null);
-  if (body.flightId) query = query.eq("id", body.flightId);
+  let query = admin.from("planned_flights").select("*").gte("outbound_date", todayIso()).is("apify_run_id", null);
+  if (body.flightId) {
+    query = query.eq("id", body.flightId);
+  } else {
+    // Auto-checks (cron / "Check all") only run for active tracking flights.
+    // Booked flights can still be refreshed manually via the per-flight "Check now" button.
+    query = query.eq("status", "tracking");
+  }
   const { data: flights, error: flightsError } = await query.order("outbound_date");
   if (flightsError) throw flightsError;
 
@@ -486,6 +508,13 @@ async function handlePoll(admin: any, body: any) {
   return json({ processed, stillPending });
 }
 
+async function handleUsage() {
+  const token = Deno.env.get("APIFY_API_TOKEN");
+  if (!token) return json({ error: "APIFY_API_TOKEN is not configured" }, 500);
+  const usage = await fetchApifyUsage(token);
+  return json({ usage });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -514,6 +543,7 @@ Deno.serve(async (req: Request) => {
 
     if (action === "start") return await handleStart(admin, body);
     if (action === "poll") return await handlePoll(admin, body);
+    if (action === "usage") return await handleUsage();
     return json({ error: `Unknown action: ${action}` }, 400);
   } catch (error) {
     console.error(error);
