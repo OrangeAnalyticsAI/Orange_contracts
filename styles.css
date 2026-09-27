@@ -2113,6 +2113,15 @@ main {
     color: #fff;
 }
 
+.planned-flight-actions button:disabled,
+.planned-flight-actions button:disabled:hover {
+    background: rgba(237, 224, 196, 0.06);
+    border-color: var(--border);
+    color: var(--muted);
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
 .fare-watch-empty { padding: 2rem 1rem; text-align: center; color: var(--muted); border: 1px dashed var(--border-lt); }
 
 .fare-watch-alerts { display: grid; gap: 0.5rem; margin-bottom: 0.75rem; }

@@ -2243,6 +2243,11 @@ class OrangeContractApp {
         const returnLeg = flight.return_date ? ` · Return ${retTime} · ${flight.latest_return_price ? this.formatCurrency(flight.latest_return_price) : '—'}` : '';
         const legs = flight.latest_total_price ? `${outboundLeg}${returnLeg}` : safe(flight.last_error || 'Run the first live price check');
         const returnText = flight.return_date ? `<span>Return ${safe(this.formatDateUK(flight.return_date))} at ${safe(flight.return_time?.slice(0, 5))}</span>` : '<span>One way</span>';
+        const today = new Date().toISOString().slice(0, 10);
+        const isPast = flight.outbound_date < today;
+        const checkButton = isPast
+            ? `<button class="btn-check" disabled title="Historical flights cannot be checked">Check now</button>`
+            : `<button class="btn-check" data-fare-action="check" data-flight-id="${safe(flight.id)}">Check now</button>`;
         return `<article class="planned-flight-card booked">
             <header class="planned-flight-card-header">
                 <div>
@@ -2263,7 +2268,7 @@ class OrangeContractApp {
             <footer class="planned-flight-card-footer">
                 <span class="last-checked">${flight.last_checked_at ? `Checked ${safe(this.formatRelativeFareWatchTime(flight.last_checked_at))}` : 'Not checked yet'}</span>
                 <div class="planned-flight-actions">
-                    <button class="btn-check" data-fare-action="check" data-flight-id="${safe(flight.id)}">Check now</button>
+                    ${checkButton}
                     <button class="danger btn-delete" data-fare-action="delete" data-flight-id="${safe(flight.id)}">Delete</button>
                 </div>
             </footer>

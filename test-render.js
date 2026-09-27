@@ -406,7 +406,7 @@ listeners.fetch({
 check('sw: POST requests are not intercepted', responded === false);
 
 listeners.fetch({
-    request: { method: 'GET', url: 'https://app.example.com/script.js?v=42' },
+    request: { method: 'GET', url: 'https://app.example.com/script.js?v=43' },
     respondWith() { responded = true; }
 });
 check('sw: GET requests are still served from cache', responded === true);
@@ -419,13 +419,13 @@ listeners.fetch({
 check('sw: Supabase requests still bypass the cache', bypassed === true);
 
 check('sw: versioned asset URLs are precached',
-    swSource.includes("'./script.js?v=42'") && swSource.includes("'./styles.css?v=42'"));
+    swSource.includes("'./script.js?v=43'") && swSource.includes("'./styles.css?v=43'"));
 check('sw: credentials.js is precached', swSource.includes("'./credentials.js'"));
 
 // ─── 12. index.html sanity ─────────────────────────────────────────────────────
 
 const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-check('index: script and styles still referenced', indexHtml.includes('script.js?v=42') && indexHtml.includes('styles.css?v=42'));
+check('index: script and styles still referenced', indexHtml.includes('script.js?v=43') && indexHtml.includes('styles.css?v=43'));
 check('index: font stylesheet still loaded', indexHtml.includes('fonts.googleapis.com/css2'));
 check('index: preconnect hints added', indexHtml.includes('rel="preconnect" href="https://fonts.gstatic.com"'));
 check('index: every _blank link has noopener',
